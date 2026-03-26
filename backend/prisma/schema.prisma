@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  role      String   // "ADMIN", "VERHUURDER", "KUISER"
+  password  String
+  createdAt DateTime @default(now())
+  
+  properties Property[] // Een verhuurder kan meerdere properties hebben
+}
+
+model Property {
+  id        String   @id @default(cuid())
+  name      String
+  address   String?
+  ownerId   String   // ID van de verhuurder (User)
+  createdAt DateTime @default(now())
+  
+  owner     User     @relation(fields: [ownerId], references: [id])
+  bookings  Booking[]
+}
+
+model Booking {
+  id         String   @id @default(cuid())
+  externalId String   @unique
+  source     String   // "airbnb" of "booking"
+  guestName  String
+  guestEmail String
+  checkIn    DateTime
+  checkOut   DateTime
+  propertyId String
+  
+  property   Property @relation(fields: [propertyId], references: [id])
+}

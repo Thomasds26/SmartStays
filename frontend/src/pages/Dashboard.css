@@ -1,0 +1,75 @@
+.dashboard-container {
+  min-height: 100vh;
+  background-color: #f5f9ff;
+}
+
+.dashboard-nav {
+  background: white;
+  padding: 16px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  border-bottom: 2px solid #e3f2fd;
+}
+
+.nav-brand {
+  font-size: 24px;
+  font-weight: bold;
+  color: #1e88e5;
+}
+
+.nav-user {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.nav-user span {
+  color: #333;
+}
+
+.logout-btn {
+  background-color: #ff5722;
+  padding: 8px 16px;
+  width: auto;
+}
+
+.logout-btn:hover {
+  background-color: #e64a19;
+}
+
+.dashboard-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+.dashboard-content h1 {
+  color: #1e88e5;
+  margin-bottom: 8px;
+}
+
+.subtitle {
+  color: #666;
+  margin-bottom: 32px;
+}
+
+.calendar-placeholder {
+  background: white;
+  border-radius: 12px;
+  padding: 80px;
+  text-align: center;
+  border: 2px dashed #90caf9;
+  color: #666;
+}
+
+.calendar-placeholder p:first-child {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.placeholder-text {
+  font-size: 14px;
+  color: #999;
+}
