@@ -209,13 +209,15 @@ function Dashboard() {
   };
 
   const handleLogout = () => {
-    const platform = localStorage.getItem('platform');
+    const isNative = localStorage.getItem('isNativeApp') === 'true';
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     
-    if (platform === 'mobile') {
-      window.location.href = '/login';
+    if (isNative) {
+      // Native app: ga naar splash screen
+      window.location.href = '/splash';
     } else {
+      // Webapp: ga naar homepagina
       window.location.href = '/';
     }
   };

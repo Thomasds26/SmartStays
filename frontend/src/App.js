@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Home from './pages/Home';
 import Login from './pages/Login';
+import Splash from './pages/Splash';
 import Activate from './pages/Activate';
 import Dashboard from './pages/Dashboard';
 import Admin from './pages/Admin';
@@ -9,20 +10,24 @@ import Contact from './pages/Contact';
 import './App.css';
 
 function App() {
-  // Detecteer of het een mobiele app is (via URL parameter of user agent)
-  const isMobileApp = () => {
+  // Detecteer of het een echte mobiele app is (geen browser)
+  const isNativeMobileApp = () => {
+    // Check via URL parameter (wordt gebruikt door de ingebouwde app)
     const urlParams = new URLSearchParams(window.location.search);
-    const mobileParam = urlParams.get('mobile');
-    if (mobileParam === 'true') return true;
+    const nativeParam = urlParams.get('native');
+    if (nativeParam === 'true') return true;
     
-    // Of detecteer via user agent (voor als de app in WebView draait)
+    // Check via user agent voor Capacitor/Cordova/WebView
     const userAgent = navigator.userAgent.toLowerCase();
-    return userAgent.includes('smartstaysapp') || userAgent.includes('capacitor');
+    return userAgent.includes('capacitor') || 
+           userAgent.includes('cordova') || 
+           userAgent.includes('smartstaysapp');
   };
 
   useEffect(() => {
     // Sla platform info op in localStorage
-    localStorage.setItem('platform', isMobileApp() ? 'mobile' : 'web');
+    const isNative = isNativeMobileApp();
+    localStorage.setItem('isNativeApp', isNative ? 'true' : 'false');
   }, []);
 
   const isAuthenticated = () => {
@@ -41,10 +46,18 @@ function App() {
     return null;
   };
 
+  const isNative = localStorage.getItem('isNativeApp') === 'true';
+
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Home />} />
+        {/* Home pagina alleen voor web (niet native app) */}
+        {!isNative && <Route path="/" element={<Home />} />}
+        
+        {/* Voor native app: splash screen als startpagina */}
+        {isNative && <Route path="/" element={<Splash />} />}
+        
+        <Route path="/splash" element={<Splash />} />
         <Route path="/login" element={<Login />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/activate/:token" element={<Activate />} />
@@ -53,7 +66,7 @@ function App() {
           element={
             isAuthenticated() && getUserRole() === 'VERHUURDER' ? 
             <Dashboard /> : 
-            <Navigate to="/login" />
+            <Navigate to={isNative ? "/splash" : "/login"} />
           } 
         />
         <Route 
@@ -61,7 +74,7 @@ function App() {
           element={
             isAuthenticated() && getUserRole() === 'ADMIN' ? 
             <Admin /> : 
-            <Navigate to="/login" />
+            <Navigate to={isNative ? "/splash" : "/login"} />
           } 
         />
       </Routes>

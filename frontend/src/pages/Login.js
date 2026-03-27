@@ -14,6 +14,9 @@ function Login() {
     
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
+    const isNative = localStorage.getItem('isNativeApp') === 'true';
+    
+    // Al ingelogd? Ga direct door
     if (token && userData) {
       try {
         const user = JSON.parse(userData);
@@ -22,9 +25,7 @@ function Login() {
         } else if (user.role === 'VERHUURDER') {
           window.location.href = '/dashboard';
         }
-      } catch (e) {
-        // Negeer fout
-      }
+      } catch (e) {}
     }
   }, []);
 
@@ -43,10 +44,12 @@ function Login() {
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
         
-        // Stel platform in (web of mobile)
-        const urlParams = new URLSearchParams(window.location.search);
-        const isMobile = urlParams.get('mobile') === 'true';
-        localStorage.setItem('platform', isMobile ? 'mobile' : 'web');
+        // Stel isNativeApp in als die nog niet bestaat
+        if (localStorage.getItem('isNativeApp') === null) {
+          const urlParams = new URLSearchParams(window.location.search);
+          const isNative = urlParams.get('native') === 'true';
+          localStorage.setItem('isNativeApp', isNative ? 'true' : 'false');
+        }
         
         if (response.data.user.role === 'ADMIN') {
           window.location.href = '/admin';
@@ -60,6 +63,8 @@ function Login() {
       setLoading(false);
     }
   };
+
+  const isNative = localStorage.getItem('isNativeApp') === 'true';
 
   return (
     <div className="login-container">
@@ -99,11 +104,14 @@ function Login() {
           </button>
         </form>
         
-        <div className="login-footer">
-          <p className="no-account">
-            Nog geen klant? <Link to="/contact" className="contact-link">Vraag een offerte aan</Link>
-          </p>
-        </div>
+        {/* Alleen voor web (niet native app) de link naar offerte */}
+        {!isNative && (
+          <div className="login-footer">
+            <p className="no-account">
+              Nog geen klant? <Link to="/contact" className="contact-link">Vraag een offerte aan</Link>
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
