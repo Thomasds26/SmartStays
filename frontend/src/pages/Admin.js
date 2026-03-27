@@ -216,10 +216,8 @@ function Admin() {
     localStorage.removeItem('user');
     
     if (isNative) {
-      // Native app: ga naar splash screen
       window.location.href = '/splash';
     } else {
-      // Webapp: ga naar homepagina
       window.location.href = '/';
     }
   };
@@ -232,8 +230,28 @@ function Admin() {
   };
 
   const getSortIcon = (key) => {
-    if (sortConfig.key !== key) return '↕️';
-    return sortConfig.direction === 'asc' ? '↑' : '↓';
+    if (sortConfig.key !== key) {
+      return (
+        <span className="sort-icon">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M7 10L12 5L17 10M7 14L12 19L17 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </span>
+      );
+    }
+    return (
+      <span className="sort-icon">
+        {sortConfig.direction === 'asc' ? (
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 19L12 5M12 5L7 10M12 5L17 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        ) : (
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 5L12 19M12 19L7 14M12 19L17 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        )}
+      </span>
+    );
   };
 
   if (!user) return <div>Laden...</div>;
@@ -291,10 +309,18 @@ function Admin() {
               <table>
                 <thead>
                   <tr>
-                    <th onClick={() => handleSort('id')} className="sortable">ID {getSortIcon('id')}</th>
-                    <th onClick={() => handleSort('name')} className="sortable">Naam {getSortIcon('name')}</th>
-                    <th onClick={() => handleSort('email')} className="sortable">Email {getSortIcon('email')}</th>
-                    <th onClick={() => handleSort('role')} className="sortable">Rol {getSortIcon('role')}</th>
+                    <th onClick={() => handleSort('id')} className="sortable">
+                      ID {getSortIcon('id')}
+                    </th>
+                    <th onClick={() => handleSort('name')} className="sortable">
+                      Naam {getSortIcon('name')}
+                    </th>
+                    <th onClick={() => handleSort('email')} className="sortable">
+                      Email {getSortIcon('email')}
+                    </th>
+                    <th onClick={() => handleSort('role')} className="sortable">
+                      Rol {getSortIcon('role')}
+                    </th>
                     <th>Status</th>
                     <th>Acties</th>
                   </tr>
@@ -393,7 +419,7 @@ function Admin() {
         </div>
       )}
 
-      {/* Modal nieuwe woning met zoekbalk en deselect */}
+      {/* Modal nieuwe woning */}
       {showPropertyModal && (
         <div className="modal-overlay" onClick={() => setShowPropertyModal(false)}>
           <div className="modal property-modal" onClick={(e) => e.stopPropagation()}>

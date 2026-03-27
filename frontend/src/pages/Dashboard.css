@@ -1,10 +1,11 @@
-/* Dashboard.css - zonder emojis, themakleuren */
+/* Dashboard.css - Professionele stijl */
 
 :root {
   --primary: #1e88e5;
   --primary-dark: #1565c0;
   --primary-light: #e3f2fd;
   --success: #2e7d32;
+  --success-light: #e8f5e9;
   --error: #c62828;
   --error-light: #ffebee;
   --gray: #f5f5f5;
@@ -54,12 +55,23 @@
   display: none;
 }
 
+/* Uitlogknop - blauwe contour */
 .logout-btn {
-  background-color: #ff5722;
+  background: transparent;
+  border: 1px solid var(--primary);
+  color: var(--primary);
   padding: 6px 12px;
   width: auto;
   font-size: 12px;
   border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.logout-btn:hover {
+  background: var(--primary-light);
+  border-color: var(--primary-dark);
+  color: var(--primary-dark);
 }
 
 .dashboard-layout {
@@ -240,8 +252,9 @@
   font-weight: 600;
 }
 
+/* Add code button - blauwe contour */
 .add-code-btn {
-  background: none;
+  background: transparent;
   border: 1px solid var(--primary);
   color: var(--primary);
   padding: 6px 12px;
@@ -252,10 +265,13 @@
   align-items: center;
   gap: 6px;
   width: auto;
+  transition: all 0.2s;
 }
 
 .add-code-btn:hover {
   background: var(--primary-light);
+  border-color: var(--primary-dark);
+  color: var(--primary-dark);
 }
 
 .codes-grid {
@@ -336,6 +352,26 @@
   font-size: 20px;
 }
 
+/* Change code button - blauwe contour */
+.change-code-btn {
+  background: transparent;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  padding: 6px 12px;
+  width: auto;
+  margin-top: 12px;
+  font-size: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.change-code-btn:hover {
+  background: var(--primary-light);
+  border-color: var(--primary-dark);
+  color: var(--primary-dark);
+}
+
 /* Battery */
 .battery-card {
   margin-top: 16px;
@@ -380,6 +416,29 @@
   color: var(--error);
   border-radius: 8px;
   font-size: 11px;
+}
+
+/* Code input styling */
+.code-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: monospace;
+  letter-spacing: 2px;
+  text-align: center;
+}
+
+.code-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.code-input::-webkit-outer-spin-button,
+.code-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 /* Modal */
@@ -567,32 +626,4 @@
   .codes-grid {
     grid-template-columns: 1fr;
   }
-}
-
-/* Code input styling - alleen cijfers */
-.code-input {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  font-size: 14px;
-  font-family: monospace;
-  letter-spacing: 2px;
-  text-align: center;
-}
-
-.code-input:focus {
-  outline: none;
-  border-color: var(--primary);
-}
-
-/* Verwijder spinner voor number input (fallback) */
-.code-input::-webkit-outer-spin-button,
-.code-input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-.code-input[type=number] {
-  -moz-appearance: textfield;
 }
