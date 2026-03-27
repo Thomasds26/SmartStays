@@ -2,6 +2,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const { Pool } = require('pg');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = 3000;
@@ -10,7 +11,6 @@ const JWT_SECRET = 'smartstays-secret-key-2024';
 app.use(cors());
 app.use(express.json());
 
-// PostgreSQL verbinding
 const pool = new Pool({
   user: 'thomasdeschepper',
   host: 'localhost',
@@ -18,12 +18,66 @@ const pool = new Pool({
   port: 5432,
 });
 
-// Health check
+// ============ MIDDLEWARE ============
+const verifyToken = (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  
+  if (!token) {
+    return res.status(401).json({ error: 'Geen toegang. Niet ingelogd.' });
+  }
+  
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.userId = decoded.id;
+    req.userRole = decoded.role;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Ongeldige of verlopen token' });
+  }
+};
+
+const checkActiveUser = async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      'SELECT "isActive", role FROM "User" WHERE id = $1',
+      [req.userId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Gebruiker niet gevonden' });
+    }
+    
+    if (!result.rows[0].isActive) {
+      return res.status(403).json({ error: 'Account is niet geactiveerd. Check je email.' });
+    }
+    
+    req.userRole = result.rows[0].role;
+    next();
+  } catch (error) {
+    console.error('Error checking active user:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+const checkAdmin = (req, res, next) => {
+  if (req.userRole !== 'ADMIN') {
+    return res.status(403).json({ error: 'Geen toegang. Alleen voor admins.' });
+  }
+  next();
+};
+
+const checkOwnerOrAdmin = (req, res, next) => {
+  if (req.userRole !== 'ADMIN' && req.userRole !== 'VERHUURDER') {
+    return res.status(403).json({ error: 'Geen toegang. Alleen voor verhuurders en admins.' });
+  }
+  next();
+};
+
+// ============ PUBLIC ENDPOINTS ============
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'SmartStays API werkt 🚀' });
 });
 
-// Login endpoint
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
 
@@ -32,9 +86,8 @@ app.post('/api/login', async (req, res) => {
   }
 
   try {
-    // Query database
     const result = await pool.query(
-      'SELECT id, email, name, role, password FROM "User" WHERE email = $1',
+      'SELECT id, email, name, role, password, "isActive" FROM "User" WHERE email = $1',
       [email]
     );
 
@@ -44,24 +97,24 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ error: 'Ongeldige email of wachtwoord' });
     }
 
-    // Check rol
-    if (user.role !== 'ADMIN' && user.role !== 'VERHUURDER') {
-      return res.status(403).json({ error: 'Geen toegang. Alleen verhuurders en admins kunnen inloggen.' });
+    if (!user.isActive) {
+      return res.status(401).json({ error: 'Account nog niet geactiveerd. Check je email.' });
     }
 
-    // Check wachtwoord (tijdelijk zonder hashing)
+    if (user.role !== 'ADMIN' && user.role !== 'VERHUURDER') {
+      return res.status(403).json({ error: 'Geen toegang.' });
+    }
+
     if (password !== user.password) {
       return res.status(401).json({ error: 'Ongeldige email of wachtwoord' });
     }
 
-    // Genereer JWT token
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    // Stuur response zonder wachtwoord
     const { password: _, ...userWithoutPassword } = user;
     res.json({
       success: true,
@@ -75,59 +128,43 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// Beveiligde endpoint - haal eigen gegevens op
-app.get('/api/me', async (req, res) => {
-  const token = req.headers.authorization?.split(' ')[1];
+app.post('/api/activate', async (req, res) => {
+  const { token, name, password } = req.body;
 
-  if (!token) {
-    return res.status(401).json({ error: 'Geen token' });
+  if (!token || !name || !password) {
+    return res.status(400).json({ error: 'Alle velden zijn verplicht' });
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    
     const result = await pool.query(
-      'SELECT id, email, name, role, "createdAt" FROM "User" WHERE id = $1',
-      [decoded.id]
+      'SELECT id, email FROM "User" WHERE "activationToken" = $1 AND "isActive" = false',
+      [token]
     );
 
     const user = result.rows[0];
 
     if (!user) {
-      return res.status(404).json({ error: 'Gebruiker niet gevonden' });
+      return res.status(400).json({ error: 'Ongeldige of verlopen activatie link' });
     }
 
-    res.json(user);
+    await pool.query(
+      'UPDATE "User" SET name = $1, password = $2, "isActive" = true, "activationToken" = NULL WHERE id = $3',
+      [name, password, user.id]
+    );
+
+    res.json({ success: true, message: 'Account succesvol geactiveerd! Je kunt nu inloggen.' });
   } catch (error) {
-    res.status(401).json({ error: 'Ongeldige token' });
+    console.error('Activate error:', error);
+    res.status(500).json({ error: 'Activatie mislukt' });
   }
 });
 
-// NIEUW: Haal alle gebruikers op (alleen voor admin)
-app.get('/api/users', async (req, res) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  
-  if (!token) {
-    return res.status(401).json({ error: 'Geen token' });
-  }
-  
+// ============ ADMIN ENDPOINTS ============
+app.get('/api/users', verifyToken, checkActiveUser, checkAdmin, async (req, res) => {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    
-    // Check of gebruiker admin is
-    const userCheck = await pool.query(
-      'SELECT role FROM "User" WHERE id = $1',
-      [decoded.id]
-    );
-    
-    if (userCheck.rows[0]?.role !== 'ADMIN') {
-      return res.status(403).json({ error: 'Geen toegang. Alleen admins kunnen gebruikers bekijken.' });
-    }
-    
     const result = await pool.query(
-      'SELECT id, email, name, role, "createdAt" FROM "User" ORDER BY "createdAt" DESC'
+      'SELECT id, email, name, role, "isActive", "createdAt" FROM "User" ORDER BY "createdAt" DESC'
     );
-    
     res.json(result.rows);
   } catch (error) {
     console.error('Fout bij ophalen gebruikers:', error);
@@ -135,33 +172,14 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
-// NIEUW: Nieuwe gebruiker toevoegen (alleen voor admin)
-app.post('/api/users', async (req, res) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  const { email, name, role, password } = req.body;
+app.post('/api/users', verifyToken, checkActiveUser, checkAdmin, async (req, res) => {
+  const { email, role } = req.body;
   
-  if (!token) {
-    return res.status(401).json({ error: 'Geen token' });
-  }
-  
-  if (!email || !name || !role || !password) {
-    return res.status(400).json({ error: 'Alle velden zijn verplicht' });
+  if (!email || !role) {
+    return res.status(400).json({ error: 'Email en rol zijn verplicht' });
   }
   
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    
-    // Check of gebruiker admin is
-    const userCheck = await pool.query(
-      'SELECT role FROM "User" WHERE id = $1',
-      [decoded.id]
-    );
-    
-    if (userCheck.rows[0]?.role !== 'ADMIN') {
-      return res.status(403).json({ error: 'Geen toegang. Alleen admins kunnen gebruikers toevoegen.' });
-    }
-    
-    // Check of email al bestaat
     const existingUser = await pool.query(
       'SELECT id FROM "User" WHERE email = $1',
       [email]
@@ -171,21 +189,293 @@ app.post('/api/users', async (req, res) => {
       return res.status(400).json({ error: 'Dit emailadres is al in gebruik' });
     }
     
-    // Voeg nieuwe gebruiker toe
+    const activationToken = crypto.randomBytes(32).toString('hex');
+    
     const result = await pool.query(
-      'INSERT INTO "User" (id, email, name, role, password, "createdAt") VALUES (gen_random_uuid()::text, $1, $2, $3, $4, NOW()) RETURNING id, email, name, role, "createdAt"',
-      [email, name, role, password]
+      'INSERT INTO "User" (id, email, role, "activationToken", "isActive", "createdAt") VALUES (gen_random_uuid()::text, $1, $2, $3, false, NOW()) RETURNING id, email, role, "isActive"',
+      [email, role, activationToken]
     );
     
-    res.json({ success: true, user: result.rows[0] });
+    console.log(`\n📧 ========== ACTIVATIE LINK ==========`);
+    console.log(`Email: ${email}`);
+    console.log(`Link: http://localhost:3001/activate/${activationToken}`);
+    console.log(`=====================================\n`);
+    
+    res.json({ 
+      success: true, 
+      user: result.rows[0],
+      message: `Gebruiker toegevoegd. Activatie link: /activate/${activationToken.substring(0, 8)}...`
+    });
   } catch (error) {
     console.error('Fout bij toevoegen gebruiker:', error);
     res.status(500).json({ error: 'Gebruiker kon niet worden toegevoegd' });
   }
 });
 
+app.delete('/api/users/:id', verifyToken, checkActiveUser, checkAdmin, async (req, res) => {
+  const userIdToDelete = req.params.id;
+  
+  try {
+    const userExists = await pool.query(
+      'SELECT id FROM "User" WHERE id = $1',
+      [userIdToDelete]
+    );
+    
+    if (userExists.rows.length === 0) {
+      return res.status(404).json({ error: 'Gebruiker niet gevonden' });
+    }
+    
+    if (req.userId === userIdToDelete) {
+      return res.status(400).json({ error: 'Je kunt jezelf niet verwijderen' });
+    }
+    
+    await pool.query('DELETE FROM "Property" WHERE "ownerId" = $1', [userIdToDelete]);
+    await pool.query('DELETE FROM "PersonalCode" WHERE "userId" = $1', [userIdToDelete]);
+    await pool.query('DELETE FROM "User" WHERE id = $1', [userIdToDelete]);
+    
+    res.json({ success: true, message: 'Gebruiker en bijbehorende gegevens verwijderd' });
+  } catch (error) {
+    console.error('Fout bij verwijderen:', error);
+    res.status(500).json({ error: 'Kon gebruiker niet verwijderen: ' + error.message });
+  }
+});
+
+// Admin: Haal alle properties op
+app.get('/api/admin/properties', verifyToken, checkActiveUser, checkAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT p.id, p.name, p.address, p."ownerId", u.email as owner_email, u.name as owner_name
+      FROM "Property" p
+      LEFT JOIN "User" u ON p."ownerId" = u.id
+      ORDER BY p."createdAt" DESC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Fout bij ophalen properties:', error);
+    res.status(500).json({ error: 'Kon properties niet ophalen' });
+  }
+});
+
+// Admin: Voeg property toe
+app.post('/api/admin/properties', verifyToken, checkActiveUser, checkAdmin, async (req, res) => {
+  const { name, address, ownerId } = req.body;
+  
+  if (!name || !ownerId) {
+    return res.status(400).json({ error: 'Naam en verhuurder zijn verplicht' });
+  }
+  
+  try {
+    const ownerCheck = await pool.query(
+      'SELECT id FROM "User" WHERE id = $1 AND role = $2',
+      [ownerId, 'VERHUURDER']
+    );
+    
+    if (ownerCheck.rows.length === 0) {
+      return res.status(400).json({ error: 'Verhuurder niet gevonden' });
+    }
+    
+    const result = await pool.query(
+      'INSERT INTO "Property" (id, name, address, "ownerId", "createdAt") VALUES (gen_random_uuid()::text, $1, $2, $3, NOW()) RETURNING id, name, address, "ownerId"',
+      [name, address || null, ownerId]
+    );
+    
+    res.json({ success: true, property: result.rows[0] });
+  } catch (error) {
+    console.error('Fout bij toevoegen property:', error);
+    res.status(500).json({ error: 'Property kon niet worden toegevoegd' });
+  }
+});
+
+// Admin: Verwijder property
+app.delete('/api/admin/properties/:id', verifyToken, checkActiveUser, checkAdmin, async (req, res) => {
+  const propertyId = req.params.id;
+  
+  try {
+    await pool.query('DELETE FROM "Booking" WHERE "propertyId" = $1', [propertyId]);
+    await pool.query('DELETE FROM "Property" WHERE id = $1', [propertyId]);
+    res.json({ success: true, message: 'Property verwijderd' });
+  } catch (error) {
+    console.error('Fout bij verwijderen property:', error);
+    res.status(500).json({ error: 'Kon property niet verwijderen' });
+  }
+});
+
+// ============ VERHUURDER ENDPOINTS ============
+app.get('/api/properties', verifyToken, checkActiveUser, checkOwnerOrAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, name, address, "createdAt" FROM "Property" WHERE "ownerId" = $1 ORDER BY "createdAt" DESC',
+      [req.userId]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Fout bij ophalen properties:', error);
+    res.status(500).json({ error: 'Kon properties niet ophalen' });
+  }
+});
+
+app.put('/api/properties/:id', verifyToken, checkActiveUser, checkOwnerOrAdmin, async (req, res) => {
+  const propertyId = req.params.id;
+  const { name, address } = req.body;
+  
+  if (!name) {
+    return res.status(400).json({ error: 'Naam is verplicht' });
+  }
+  
+  try {
+    const propertyCheck = await pool.query(
+      'SELECT id FROM "Property" WHERE id = $1 AND "ownerId" = $2',
+      [propertyId, req.userId]
+    );
+    
+    if (propertyCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Geen toegang tot deze property' });
+    }
+    
+    const result = await pool.query(
+      'UPDATE "Property" SET name = $1, address = $2 WHERE id = $3 RETURNING id, name, address',
+      [name, address || null, propertyId]
+    );
+    
+    res.json({ success: true, property: result.rows[0] });
+  } catch (error) {
+    console.error('Fout bij updaten property:', error);
+    res.status(500).json({ error: 'Property kon niet worden bijgewerkt' });
+  }
+});
+
+app.get('/api/me', verifyToken, checkActiveUser, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, email, name, role, "isActive", "createdAt" FROM "User" WHERE id = $1',
+      [req.userId]
+    );
+    
+    const user = result.rows[0];
+    if (!user) {
+      return res.status(404).json({ error: 'Gebruiker niet gevonden' });
+    }
+    
+    res.json(user);
+  } catch (error) {
+    console.error('Fout bij ophalen gebruiker:', error);
+    res.status(500).json({ error: 'Kon gebruiker niet ophalen' });
+  }
+});
+
+// ============ PERSONAL CODES ENDPOINTS ============
+
+// Haal alle personal codes op van de ingelogde gebruiker
+app.get('/api/personal-codes', verifyToken, checkActiveUser, checkOwnerOrAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, name, code, "createdAt" FROM "PersonalCode" WHERE "userId" = $1 ORDER BY "createdAt" ASC',
+      [req.userId]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Fout bij ophalen personal codes:', error);
+    res.status(500).json({ error: 'Kon personal codes niet ophalen' });
+  }
+});
+
+// Voeg een nieuwe personal code toe
+app.post('/api/personal-codes', verifyToken, checkActiveUser, checkOwnerOrAdmin, async (req, res) => {
+  const { name, code } = req.body;
+  
+  if (!code) {
+    return res.status(400).json({ error: 'Code is verplicht' });
+  }
+  
+  if (!/^\d{6}$/.test(code)) {
+    return res.status(400).json({ error: 'Code moet exact 6 cijfers zijn' });
+  }
+  
+  try {
+    // Check hoeveel codes de gebruiker al heeft (max 4)
+    const countResult = await pool.query(
+      'SELECT COUNT(*) FROM "PersonalCode" WHERE "userId" = $1',
+      [req.userId]
+    );
+    
+    const codeCount = parseInt(countResult.rows[0].count);
+    if (codeCount >= 4) {
+      return res.status(400).json({ error: 'Maximaal 4 codes toegestaan' });
+    }
+    
+    const result = await pool.query(
+      'INSERT INTO "PersonalCode" (id, name, code, "userId", "createdAt") VALUES (gen_random_uuid()::text, $1, $2, $3, NOW()) RETURNING id, name, code',
+      [name || `Code ${codeCount + 1}`, code, req.userId]
+    );
+    
+    res.json({ success: true, code: result.rows[0] });
+  } catch (error) {
+    console.error('Fout bij toevoegen personal code:', error);
+    res.status(500).json({ error: 'Code kon niet worden toegevoegd' });
+  }
+});
+
+// Update een bestaande personal code
+app.put('/api/personal-codes/:id', verifyToken, checkActiveUser, checkOwnerOrAdmin, async (req, res) => {
+  const codeId = req.params.id;
+  const { name, code } = req.body;
+  
+  if (!code) {
+    return res.status(400).json({ error: 'Code is verplicht' });
+  }
+  
+  if (!/^\d{6}$/.test(code)) {
+    return res.status(400).json({ error: 'Code moet exact 6 cijfers zijn' });
+  }
+  
+  try {
+    // Check of code van deze gebruiker is
+    const codeCheck = await pool.query(
+      'SELECT id FROM "PersonalCode" WHERE id = $1 AND "userId" = $2',
+      [codeId, req.userId]
+    );
+    
+    if (codeCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Geen toegang tot deze code' });
+    }
+    
+    const result = await pool.query(
+      'UPDATE "PersonalCode" SET name = $1, code = $2 WHERE id = $3 RETURNING id, name, code',
+      [name || null, code, codeId]
+    );
+    
+    res.json({ success: true, code: result.rows[0] });
+  } catch (error) {
+    console.error('Fout bij updaten personal code:', error);
+    res.status(500).json({ error: 'Code kon niet worden bijgewerkt' });
+  }
+});
+
+// Verwijder een personal code
+app.delete('/api/personal-codes/:id', verifyToken, checkActiveUser, checkOwnerOrAdmin, async (req, res) => {
+  const codeId = req.params.id;
+  
+  try {
+    // Check of code van deze gebruiker is
+    const codeCheck = await pool.query(
+      'SELECT id FROM "PersonalCode" WHERE id = $1 AND "userId" = $2',
+      [codeId, req.userId]
+    );
+    
+    if (codeCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Geen toegang tot deze code' });
+    }
+    
+    await pool.query('DELETE FROM "PersonalCode" WHERE id = $1', [codeId]);
+    
+    res.json({ success: true, message: 'Code verwijderd' });
+  } catch (error) {
+    console.error('Fout bij verwijderen personal code:', error);
+    res.status(500).json({ error: 'Code kon niet worden verwijderd' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 Server draait op http://localhost:${PORT}`);
   console.log(`📡 Health: http://localhost:${PORT}/api/health`);
-  console.log(`👥 Users: http://localhost:${PORT}/api/users (alleen admin)`);
 });

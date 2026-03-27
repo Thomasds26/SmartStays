@@ -7,21 +7,24 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  role      String   // "ADMIN", "VERHUURDER", "KUISER"
-  password  String
-  createdAt DateTime @default(now())
+  id              String   @id @default(cuid())
+  email           String   @unique
+  name            String?
+  role            String   // "ADMIN", "VERHUURDER", "KUISER"
+  password        String?
+  isActive        Boolean  @default(false)
+  activationToken String?
+  createdAt       DateTime @default(now())
   
-  properties Property[] // Een verhuurder kan meerdere properties hebben
+  properties     Property[]
+  personalCodes  PersonalCode[]
 }
 
 model Property {
   id        String   @id @default(cuid())
   name      String
   address   String?
-  ownerId   String   // ID van de verhuurder (User)
+  ownerId   String
   createdAt DateTime @default(now())
   
   owner     User     @relation(fields: [ownerId], references: [id])
@@ -31,7 +34,7 @@ model Property {
 model Booking {
   id         String   @id @default(cuid())
   externalId String   @unique
-  source     String   // "airbnb" of "booking"
+  source     String
   guestName  String
   guestEmail String
   checkIn    DateTime
@@ -39,4 +42,14 @@ model Booking {
   propertyId String
   
   property   Property @relation(fields: [propertyId], references: [id])
+}
+
+model PersonalCode {
+  id        String   @id @default(cuid())
+  name      String
+  code      String
+  userId    String
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id])
 }
