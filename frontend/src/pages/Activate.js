@@ -9,12 +9,33 @@ function Activate() {
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [personalCode, setPersonalCode] = useState('');
+  const [confirmPersonalCode, setConfirmPersonalCode] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [role, setRole] = useState('');
 
   useEffect(() => {
     document.title = 'SmartStays - Activeer account';
-  }, []);
+    
+    const fetchUserRole = async () => {
+      try {
+        const response = await axios.post('http://localhost:3000/api/check-activation', { token });
+        setRole(response.data.role);
+      } catch (error) {
+        setMessage('Ongeldige activatie link');
+      }
+    };
+    fetchUserRole();
+  }, [token]);
+
+  const validateCode = (code) => {
+    if (code.length === 0) return null;
+    if (!/^\d{6}$/.test(code)) {
+      return 'Code moet exact 6 cijfers zijn';
+    }
+    return null;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -34,12 +55,32 @@ function Activate() {
       return;
     }
     
+    if (role === 'SCHOONMAKER') {
+      // Check of code exact 6 cijfers is
+      if (!personalCode || personalCode.length !== 6) {
+        setMessage('Persoonlijke code moet exact 6 cijfers zijn');
+        return;
+      }
+      
+      const codeError = validateCode(personalCode);
+      if (codeError) {
+        setMessage(codeError);
+        return;
+      }
+      
+      if (personalCode !== confirmPersonalCode) {
+        setMessage('Persoonlijke codes komen niet overeen');
+        return;
+      }
+    }
+    
     setLoading(true);
     try {
       const response = await axios.post('http://localhost:3000/api/activate', {
         token,
         name,
-        password
+        password,
+        personalCode: role === 'SCHOONMAKER' ? personalCode : null
       });
       
       setMessage(response.data.message);
@@ -51,12 +92,22 @@ function Activate() {
     }
   };
 
+  const handlePersonalCodeChange = (e) => {
+    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+    setPersonalCode(value);
+  };
+
+  const handleConfirmPersonalCodeChange = (e) => {
+    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+    setConfirmPersonalCode(value);
+  };
+
   return (
     <div className="activate-container">
       <div className="activate-card">
         <div className="activate-header">
           <h1>SmartStays</h1>
-          <p>Activeer je account</p>
+          <p>Activeer je {role === 'SCHOONMAKER' ? 'schoonmaker' : ''} account</p>
         </div>
         
         <form onSubmit={handleSubmit}>
@@ -92,6 +143,37 @@ function Activate() {
               placeholder="••••••••"
             />
           </div>
+          
+          {role === 'SCHOONMAKER' && (
+            <>
+              <div className="form-group">
+                <label>Persoonlijke code (exact 6 cijfers)</label>
+                <input
+                  type="text"
+                  value={personalCode}
+                  onChange={handlePersonalCodeChange}
+                  required
+                  placeholder="123456"
+                  maxLength="6"
+                  className="code-input"
+                />
+                <small className="code-hint">Vul exact 6 cijfers in</small>
+              </div>
+              
+              <div className="form-group">
+                <label>Herhaal persoonlijke code</label>
+                <input
+                  type="text"
+                  value={confirmPersonalCode}
+                  onChange={handleConfirmPersonalCodeChange}
+                  required
+                  placeholder="123456"
+                  maxLength="6"
+                  className="code-input"
+                />
+              </div>
+            </>
+          )}
           
           {message && <div className="message">{message}</div>}
           

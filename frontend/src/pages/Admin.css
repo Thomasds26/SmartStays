@@ -5,7 +5,9 @@
   --primary-dark: #1565c0;
   --primary-light: #e3f2fd;
   --success: #2e7d32;
+  --success-light: #e8f5e9;
   --error: #c62828;
+  --error-light: #ffebee;
   --gray: #f5f5f5;
   --gray-dark: #666;
   --border: #e0e0e0;
@@ -53,7 +55,6 @@
   display: none;
 }
 
-/* Uitlogknop - alleen blauwe contour */
 .logout-btn {
   background: transparent;
   border: 1px solid var(--primary);
@@ -98,6 +99,7 @@
   padding: 4px;
   border-radius: 40px;
   box-shadow: var(--shadow);
+  flex-wrap: wrap;
 }
 
 .tab-btn {
@@ -109,6 +111,7 @@
   cursor: pointer;
   width: auto;
   color: var(--gray-dark);
+  transition: all 0.2s;
 }
 
 .tab-btn.active {
@@ -129,7 +132,6 @@
   margin: 0;
 }
 
-/* Add button - alleen blauwe contour */
 .add-btn {
   background: transparent;
   border: 1px solid var(--primary);
@@ -243,7 +245,6 @@ th {
   font-size: 12px;
 }
 
-/* Sorteerbare kolommen - zonder emoji */
 .sortable {
   cursor: pointer;
   user-select: none;
@@ -255,7 +256,6 @@ th {
   background-color: var(--primary-light);
 }
 
-/* Sorteer icoon als SVG in plaats van emoji */
 .sort-icon {
   display: inline-flex;
   align-items: center;
@@ -290,7 +290,7 @@ th {
   color: var(--primary-dark);
 }
 
-.role-kuiser {
+.role-schoonmaker {
   background-color: var(--success-light);
   color: var(--success);
 }
@@ -340,7 +340,6 @@ th {
   font-size: 14px;
 }
 
-/* Modal */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -389,7 +388,8 @@ th {
   padding: 0;
 }
 
-.modal form, .modal-body {
+.modal form,
+.modal-body {
   padding: 20px;
 }
 
@@ -406,18 +406,25 @@ th {
 }
 
 .form-group input,
-.form-group select {
+.form-group select,
+.form-group textarea {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 10px;
   font-size: 14px;
+  font-family: inherit;
 }
 
 .form-group input:focus,
-.form-group select:focus {
+.form-group select:focus,
+.form-group textarea:focus {
   outline: none;
   border-color: var(--primary);
+}
+
+.form-group textarea {
+  resize: vertical;
 }
 
 .modal-buttons {
@@ -466,7 +473,6 @@ th {
   margin: 16px 0;
 }
 
-/* Zoekbare select dropdown */
 .search-select-input {
   width: 100%;
   padding: 10px 12px;
@@ -517,7 +523,8 @@ th {
   margin-top: 2px;
 }
 
-.dropdown-empty, .dropdown-hint {
+.dropdown-empty,
+.dropdown-hint {
   padding: 12px;
   text-align: center;
   color: #999;
@@ -556,50 +563,50 @@ th {
   max-width: 500px;
 }
 
-/* Tablet en Desktop */
 @media (min-width: 768px) {
   .admin-nav {
     padding: 16px 32px;
   }
-  
+
   .nav-brand {
     font-size: 24px;
   }
-  
+
   .nav-user span {
     display: inline;
   }
-  
+
   .admin-content {
     padding: 32px;
   }
-  
+
   .admin-header {
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
   }
-  
+
   .add-btn {
     width: auto;
     padding: 10px 20px;
   }
-  
+
   .logout-btn {
     padding: 8px 16px;
     font-size: 13px;
   }
-  
-  th, td {
+
+  th,
+  td {
     padding: 14px 12px;
     font-size: 14px;
   }
-  
+
   .id-cell {
     font-size: 12px;
     max-width: none;
   }
-  
+
   .action-btn {
     font-size: 13px;
   }
@@ -608,5 +615,124 @@ th {
 @media (min-width: 1024px) {
   .admin-content {
     padding: 40px;
+  }
+}
+
+/* Kalender styling */
+.calendar-container {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+
+.calendar-placeholder {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--gray-dark);
+}
+
+.placeholder-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.calendar-placeholder h3 {
+  color: var(--primary);
+  margin-bottom: 12px;
+  font-size: 20px;
+}
+
+.calendar-placeholder p {
+  margin: 8px 0;
+  font-size: 14px;
+}
+
+.placeholder-note {
+  font-size: 12px;
+  color: #999;
+  margin-top: 16px;
+}
+
+.tasks-calendar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.calendar-task-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: var(--gray);
+  border-radius: 12px;
+  transition: all 0.2s;
+}
+
+.calendar-task-card:hover {
+  background: var(--primary-light);
+  transform: translateX(4px);
+}
+
+.task-time {
+  min-width: 140px;
+  font-weight: 600;
+  color: var(--primary);
+  font-size: 13px;
+}
+
+.task-info {
+  flex: 1;
+}
+
+.task-info h4 {
+  margin: 0 0 4px 0;
+  color: #333;
+  font-size: 16px;
+}
+
+.task-info p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--gray-dark);
+}
+
+.task-duration {
+  margin-top: 4px !important;
+}
+
+.task-status-badge {
+  text-align: right;
+  min-width: 100px;
+}
+
+.cleaner-name {
+  display: block;
+  font-size: 11px;
+  color: var(--gray-dark);
+  margin-top: 4px;
+}
+
+.info-text {
+  color: var(--gray-dark);
+  font-size: 13px;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .calendar-task-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .task-time {
+    min-width: auto;
+  }
+  
+  .task-status-badge {
+    text-align: left;
+    min-width: auto;
   }
 }

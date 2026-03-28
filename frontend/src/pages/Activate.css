@@ -56,6 +56,20 @@
   border-color: #1e88e5;
 }
 
+.code-input {
+  font-family: monospace;
+  letter-spacing: 2px;
+  text-align: center;
+  font-size: 20px;
+}
+
+.code-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #999;
+}
+
 .message {
   background-color: #ffebee;
   color: #c62828;
@@ -75,6 +89,7 @@ button {
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
+  transition: background-color 0.3s;
 }
 
 button:hover {
@@ -84,4 +99,14 @@ button:hover {
 button:disabled {
   background-color: #90caf9;
   cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .activate-card {
+    padding: 24px;
+  }
+  
+  .activate-header h1 {
+    font-size: 28px;
+  }
 }

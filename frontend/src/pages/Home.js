@@ -10,7 +10,9 @@ function Home() {
     
     const token = localStorage.getItem('token');
     const user = localStorage.getItem('user');
-    if (token && user) {
+    const isNative = localStorage.getItem('isNativeApp') === 'true';
+    
+    if (token && user && !isNative) {
       try {
         const userData = JSON.parse(user);
         if (userData.role === 'ADMIN') {
@@ -28,7 +30,7 @@ function Home() {
 
   return (
     <div className="home-container">
-      {/* Hero sectie */}
+      {/* Hero sectie met cloud afbeelding */}
       <section className="hero">
         <div className="hero-content">
           <h1>SmartStays</h1>
@@ -40,22 +42,7 @@ function Home() {
           <button onClick={goToLogin} className="cta-btn">Start nu</button>
         </div>
         <div className="hero-image">
-          <div className="mockup">
-            <div className="mockup-header">
-              <span>SmartStays</span>
-              <span className="mockup-badge">Demo</span>
-            </div>
-            <div className="mockup-content">
-              <div className="calendar-demo">
-                <div className="demo-date">📅 15-20 Maart</div>
-                <div className="demo-guest">Gast: Jan Jansen</div>
-              </div>
-              <div className="lock-demo">
-                <div className="demo-code">🔒 Code: 123456</div>
-                <div className="demo-status">Actief tot 20/03</div>
-              </div>
-            </div>
-          </div>
+          <img src="/cloud.png" alt="SmartStays cloud solution" className="cloud-image" />
         </div>
       </section>
 
@@ -75,22 +62,42 @@ function Home() {
         <h2>Alles-in-één platform</h2>
         <div className="features-grid">
           <div className="feature-card">
-            <div className="feature-icon">🔐</div>
+            <div className="feature-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 2C8.13 2 5 5.13 5 9V12C3.5 12.5 3 13 3 15V18C3 19.1 3.9 20 5 20H19C20.1 20 21 19.1 21 18V15C21 13 20.5 12.5 19 12V9C19 5.13 15.87 2 12 2Z" stroke="#1e88e5" strokeWidth="1.5" fill="none"/>
+                <path d="M9 22L12 20L15 22" stroke="#1e88e5" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </div>
             <h3>Automatische codes</h3>
             <p>Genereer unieke codes voor elke gast en kuisdienst</p>
           </div>
           <div className="feature-card">
-            <div className="feature-icon">📅</div>
+            <div className="feature-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M4 4H20V20H4V4Z" stroke="#1e88e5" strokeWidth="1.5" fill="none"/>
+                <path d="M8 8H16M8 12H16M8 16H12" stroke="#1e88e5" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </div>
             <h3>Kalender integratie</h3>
             <p>Synchroniseer met Airbnb en Booking.com</p>
           </div>
           <div className="feature-card">
-            <div className="feature-icon">🧹</div>
+            <div className="feature-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 21L21 3M8 3L5 6L8 9M16 15L19 18L22 15" stroke="#1e88e5" strokeWidth="1.5" strokeLinecap="round"/>
+                <circle cx="12" cy="12" r="3" stroke="#1e88e5" strokeWidth="1.5" fill="none"/>
+              </svg>
+            </div>
             <h3>Kuisdienst planning</h3>
             <p>Plan en beheer kuismomenten automatisch</p>
           </div>
           <div className="feature-card">
-            <div className="feature-icon">📱</div>
+            <div className="feature-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3" y="6" width="18" height="12" rx="2" stroke="#1e88e5" strokeWidth="1.5" fill="none"/>
+                <path d="M21 10V14" stroke="#1e88e5" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </div>
             <h3>Mobiele app</h3>
             <p>Beheer alles onderweg via je smartphone</p>
           </div>

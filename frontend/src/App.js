@@ -6,18 +6,16 @@ import Splash from './pages/Splash';
 import Activate from './pages/Activate';
 import Dashboard from './pages/Dashboard';
 import Admin from './pages/Admin';
+import CleanerDashboard from './pages/CleanerDashboard';
 import Contact from './pages/Contact';
 import './App.css';
 
 function App() {
-  // Detecteer of het een echte mobiele app is (geen browser)
   const isNativeMobileApp = () => {
-    // Check via URL parameter (wordt gebruikt door de ingebouwde app)
     const urlParams = new URLSearchParams(window.location.search);
     const nativeParam = urlParams.get('native');
     if (nativeParam === 'true') return true;
     
-    // Check via user agent voor Capacitor/Cordova/WebView
     const userAgent = navigator.userAgent.toLowerCase();
     return userAgent.includes('capacitor') || 
            userAgent.includes('cordova') || 
@@ -25,9 +23,7 @@ function App() {
   };
 
   useEffect(() => {
-    // Sla platform info op in localStorage
-    const isNative = isNativeMobileApp();
-    localStorage.setItem('isNativeApp', isNative ? 'true' : 'false');
+    localStorage.setItem('isNativeApp', isNativeMobileApp() ? 'true' : 'false');
   }, []);
 
   const isAuthenticated = () => {
@@ -51,12 +47,8 @@ function App() {
   return (
     <Router>
       <Routes>
-        {/* Home pagina alleen voor web (niet native app) */}
         {!isNative && <Route path="/" element={<Home />} />}
-        
-        {/* Voor native app: splash screen als startpagina */}
         {isNative && <Route path="/" element={<Splash />} />}
-        
         <Route path="/splash" element={<Splash />} />
         <Route path="/login" element={<Login />} />
         <Route path="/contact" element={<Contact />} />
@@ -66,6 +58,14 @@ function App() {
           element={
             isAuthenticated() && getUserRole() === 'VERHUURDER' ? 
             <Dashboard /> : 
+            <Navigate to={isNative ? "/splash" : "/login"} />
+          } 
+        />
+        <Route 
+          path="/cleaner" 
+          element={
+            isAuthenticated() && getUserRole() === 'SCHOONMAKER' ? 
+            <CleanerDashboard /> : 
             <Navigate to={isNative ? "/splash" : "/login"} />
           } 
         />

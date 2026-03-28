@@ -314,3 +314,67 @@
     font-size: 20px;
   }
 }
+
+/* Home.css - voeg toe aan bestaande CSS */
+
+.hero-image {
+  margin-top: 40px;
+  display: none;
+}
+
+.cloud-image {
+  max-width: 100%;
+  height: auto;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+/* Tablet */
+@media (min-width: 768px) {
+  .hero {
+    padding: 80px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    text-align: left;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  
+  .hero-content {
+    flex: 1;
+    max-width: 500px;
+  }
+  
+  .hero-content h1 {
+    font-size: 52px;
+  }
+  
+  .tagline {
+    font-size: 24px;
+  }
+  
+  .description {
+    font-size: 18px;
+    margin-left: 0;
+    margin-right: 0;
+  }
+  
+  .hero-image {
+    display: block;
+    flex: 1;
+    margin-top: 0;
+    margin-left: 40px;
+  }
+}

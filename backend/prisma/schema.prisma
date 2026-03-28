@@ -10,14 +10,17 @@ model User {
   id              String   @id @default(cuid())
   email           String   @unique
   name            String?
-  role            String   // "ADMIN", "VERHUURDER", "KUISER"
+  role            String   // "ADMIN", "VERHUURDER", "SCHOONMAKER"
   password        String?
   isActive        Boolean  @default(false)
   activationToken String?
+  personalCode    String?  // 6-cijferige code voor schoonmaker
   createdAt       DateTime @default(now())
   
-  properties     Property[]
-  personalCodes  PersonalCode[]
+  properties       Property[]
+  personalCodes    PersonalCode[]
+  cleaningTasks    CleaningTask[]     // taken die deze schoonmaker uitvoert
+  cleaningReserves CleaningReserve[]  // reserves voor taken
 }
 
 model Property {
@@ -27,8 +30,9 @@ model Property {
   ownerId   String
   createdAt DateTime @default(now())
   
-  owner     User     @relation(fields: [ownerId], references: [id])
-  bookings  Booking[]
+  owner         User           @relation(fields: [ownerId], references: [id])
+  bookings      Booking[]
+  cleaningTasks CleaningTask[] // Relatie naar schoonmaak taken
 }
 
 model Booking {
@@ -52,4 +56,32 @@ model PersonalCode {
   createdAt DateTime @default(now())
   
   user      User     @relation(fields: [userId], references: [id])
+}
+
+model CleaningTask {
+  id          String   @id @default(cuid())
+  propertyId  String
+  scheduledAt DateTime
+  duration    Int      // duur in minuten
+  status      String   @default("OPEN") // "OPEN", "ASSIGNED", "COMPLETED", "CANCELLED"
+  cleanerId   String?  // toegewezen schoonmaker
+  notes       String?
+  createdAt   DateTime @default(now())
+  
+  property Property     @relation(fields: [propertyId], references: [id])
+  cleaner  User?        @relation(fields: [cleanerId], references: [id])
+  reserves CleaningReserve[]
+}
+
+model CleaningReserve {
+  id        String   @id @default(cuid())
+  taskId    String
+  cleanerId String
+  status    String   @default("PENDING") // "PENDING", "ACCEPTED", "DECLINED"
+  createdAt DateTime @default(now())
+  
+  task    CleaningTask @relation(fields: [taskId], references: [id])
+  cleaner User         @relation(fields: [cleanerId], references: [id])
+  
+  @@unique([taskId, cleanerId]) // Een schoonmaker kan maar 1x reserveren per taak
 }

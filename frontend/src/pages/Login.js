@@ -14,7 +14,6 @@ function Login() {
     
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
-    const isNative = localStorage.getItem('isNativeApp') === 'true';
     
     // Al ingelogd? Ga direct door
     if (token && userData) {
@@ -22,6 +21,8 @@ function Login() {
         const user = JSON.parse(userData);
         if (user.role === 'ADMIN') {
           window.location.href = '/admin';
+        } else if (user.role === 'SCHOONMAKER') {
+          window.location.href = '/cleaner';
         } else if (user.role === 'VERHUURDER') {
           window.location.href = '/dashboard';
         }
@@ -35,7 +36,7 @@ function Login() {
     setLoading(true);
 
     try {
-      const response = await axios.post('http://192.168.0.127:3000/api/login', {
+      const response = await axios.post('http://localhost:3000/api/login', {
         email,
         password
       });
@@ -53,6 +54,8 @@ function Login() {
         
         if (response.data.user.role === 'ADMIN') {
           window.location.href = '/admin';
+        } else if (response.data.user.role === 'SCHOONMAKER') {
+          window.location.href = '/cleaner';
         } else {
           window.location.href = '/dashboard';
         }

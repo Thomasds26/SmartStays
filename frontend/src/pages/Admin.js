@@ -9,6 +9,8 @@ function Admin() {
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [properties, setProperties] = useState([]);
   const [filteredProperties, setFilteredProperties] = useState([]);
+  const [cleaningTasks, setCleaningTasks] = useState([]);
+  const [filteredTasks, setFilteredTasks] = useState([]);
   const [showUserModal, setShowUserModal] = useState(false);
   const [showPropertyModal, setShowPropertyModal] = useState(false);
   const [activeTab, setActiveTab] = useState('users');
@@ -34,7 +36,11 @@ function Admin() {
     
     const parsedUser = JSON.parse(userData);
     if (parsedUser.role !== 'ADMIN') {
-      navigate('/dashboard');
+      if (parsedUser.role === 'SCHOONMAKER') {
+        navigate('/cleaner');
+      } else {
+        navigate('/dashboard');
+      }
       return;
     }
     
@@ -42,6 +48,7 @@ function Admin() {
     fetchUsers();
     fetchProperties();
     fetchUsersList();
+    fetchCleaningTasks();
     document.title = 'SmartStays - Admin Panel';
   }, [navigate]);
 
@@ -92,6 +99,17 @@ function Admin() {
     setFilteredUsersList(result);
   }, [usersList, userSearchTerm]);
 
+  useEffect(() => {
+    let result = [...cleaningTasks];
+    if (searchTerm) {
+      result = result.filter(t => 
+        t.property_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.address?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    setFilteredTasks(result);
+  }, [cleaningTasks, searchTerm]);
+
   const fetchUsers = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -132,6 +150,18 @@ function Admin() {
       setFilteredUsersList(verhuurders);
     } catch (error) {
       console.error('Fout bij ophalen gebruikers:', error);
+    }
+  };
+
+  const fetchCleaningTasks = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get('http://localhost:3000/api/cleaning-tasks', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setCleaningTasks(response.data);
+    } catch (error) {
+      console.error('Fout bij ophalen taken:', error);
     }
   };
 
@@ -190,6 +220,7 @@ function Admin() {
       fetchUsers();
       fetchUsersList();
       fetchProperties();
+      fetchCleaningTasks();
       setTimeout(() => setMessage({ text: '', type: '' }), 3000);
     } catch (error) {
       setMessage({ text: error.response?.data?.error || 'Fout bij verwijderen', type: 'error' });
@@ -204,6 +235,7 @@ function Admin() {
       });
       setMessage({ text: `"${propertyName}" is verwijderd`, type: 'success' });
       fetchProperties();
+      fetchCleaningTasks();
       setTimeout(() => setMessage({ text: '', type: '' }), 3000);
     } catch (error) {
       setMessage({ text: 'Fout bij verwijderen', type: 'error' });
@@ -254,6 +286,16 @@ function Admin() {
     );
   };
 
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('nl-NL', {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   if (!user) return <div>Laden...</div>;
 
   return (
@@ -276,6 +318,9 @@ function Admin() {
             <button className={`tab-btn ${activeTab === 'properties' ? 'active' : ''}`} onClick={() => setActiveTab('properties')}>
               Woningen
             </button>
+            <button className={`tab-btn ${activeTab === 'calendar' ? 'active' : ''}`} onClick={() => setActiveTab('calendar')}>
+              Kalender
+            </button>
           </div>
         </div>
         
@@ -288,7 +333,7 @@ function Admin() {
         <div className="search-bar">
           <input
             type="text"
-            placeholder={`Zoeken op ${activeTab === 'users' ? 'naam, email, rol of ID...' : 'naam, verhuurder of adres...'}`}
+            placeholder={`Zoeken op ${activeTab === 'users' ? 'naam, email, rol of ID...' : activeTab === 'properties' ? 'naam, verhuurder of adres...' : 'property of adres...'}`}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="search-input"
@@ -309,18 +354,10 @@ function Admin() {
               <table>
                 <thead>
                   <tr>
-                    <th onClick={() => handleSort('id')} className="sortable">
-                      ID {getSortIcon('id')}
-                    </th>
-                    <th onClick={() => handleSort('name')} className="sortable">
-                      Naam {getSortIcon('name')}
-                    </th>
-                    <th onClick={() => handleSort('email')} className="sortable">
-                      Email {getSortIcon('email')}
-                    </th>
-                    <th onClick={() => handleSort('role')} className="sortable">
-                      Rol {getSortIcon('role')}
-                    </th>
+                    <th onClick={() => handleSort('id')} className="sortable">ID {getSortIcon('id')}</th>
+                    <th onClick={() => handleSort('name')} className="sortable">Naam {getSortIcon('name')}</th>
+                    <th onClick={() => handleSort('email')} className="sortable">Email {getSortIcon('email')}</th>
+                    <th onClick={() => handleSort('role')} className="sortable">Rol {getSortIcon('role')}</th>
                     <th>Status</th>
                     <th>Acties</th>
                   </tr>
@@ -331,14 +368,22 @@ function Admin() {
                       <td className="id-cell">{u.id}</td>
                       <td>{u.name || '-'}</td>
                       <td>{u.email}</td>
-                      <td><span className={`role-badge role-${u.role.toLowerCase()}`}>{u.role}</span></td>
+                      <td>
+                        <span className={`role-badge role-${u.role.toLowerCase()}`}>
+                          {u.role === 'SCHOONMAKER' ? 'Schoonmaker' : u.role === 'VERHUURDER' ? 'Verhuurder' : 'Admin'}
+                        </span>
+                      </td>
                       <td>
                         <span className={`status-badge ${u.isActive ? 'status-active' : 'status-pending'}`}>
                           {u.isActive ? 'Actief' : 'Wacht op activatie'}
                         </span>
                       </td>
                       <td>
-                        <button onClick={() => setDeleteConfirm({ id: u.id, name: u.name || u.email, type: 'user' })} className="action-btn" disabled={u.id === user.id}>
+                        <button 
+                          onClick={() => setDeleteConfirm({ id: u.id, name: u.name || u.email, type: 'user' })} 
+                          className="action-btn" 
+                          disabled={u.id === user.id}
+                        >
                           Verwijderen
                         </button>
                       </td>
@@ -387,6 +432,46 @@ function Admin() {
             </div>
           </>
         )}
+
+        {activeTab === 'calendar' && (
+          <>
+            <div className="section-header">
+              <h2>Schoonmaak kalender</h2>
+              <p className="info-text">Taken worden automatisch gegenereerd op basis van boekingen uit Airbnb en Booking.com</p>
+            </div>
+            
+            <div className="calendar-container">
+              {filteredTasks.length === 0 ? (
+                <div className="calendar-placeholder">
+                  <h3>Geen schoonmaak taken</h3>
+                  <p>Er zijn nog geen schoonmaak taken gegenereerd.</p>
+                  <p className="placeholder-note">Taken verschijnen hier zodra er boekingen worden gesynchroniseerd met Airbnb of Booking.com.</p>
+                </div>
+              ) : (
+                <div className="tasks-calendar">
+                  {filteredTasks.map(task => (
+                    <div key={task.id} className="calendar-task-card">
+                      <div className="task-time">{formatDate(task.scheduledAt)}</div>
+                      <div className="task-info">
+                        <h4>{task.property_name}</h4>
+                        <p>{task.address}</p>
+                        <p className="task-duration">⏱️ {task.duration} minuten</p>
+                      </div>
+                      <div className="task-status-badge">
+                        <span className={`status-badge ${task.status === 'OPEN' ? 'status-pending' : 'status-active'}`}>
+                          {task.status === 'OPEN' ? 'Open' : 'Toegewezen'}
+                        </span>
+                        {task.cleaner_name && (
+                          <span className="cleaner-name">{task.cleaner_name}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Modal nieuwe gebruiker */}
@@ -400,13 +485,19 @@ function Admin() {
             <form onSubmit={handleAddUser}>
               <div className="form-group">
                 <label>Email *</label>
-                <input type="email" value={newUser.email} onChange={(e) => setNewUser({...newUser, email: e.target.value})} required placeholder="naam@email.com" />
+                <input 
+                  type="email" 
+                  value={newUser.email} 
+                  onChange={(e) => setNewUser({...newUser, email: e.target.value})} 
+                  required 
+                  placeholder="naam@email.com" 
+                />
               </div>
               <div className="form-group">
                 <label>Rol *</label>
                 <select value={newUser.role} onChange={(e) => setNewUser({...newUser, role: e.target.value})}>
                   <option value="VERHUURDER">Verhuurder</option>
-                  <option value="KUISER">Kuiser</option>
+                  <option value="SCHOONMAKER">Schoonmaker</option>
                   <option value="ADMIN">Admin</option>
                 </select>
               </div>
@@ -430,11 +521,22 @@ function Admin() {
             <form onSubmit={handleAddProperty}>
               <div className="form-group">
                 <label>Naam *</label>
-                <input type="text" value={newProperty.name} onChange={(e) => setNewProperty({...newProperty, name: e.target.value})} required placeholder="Bijv. Zonnewende 12" />
+                <input 
+                  type="text" 
+                  value={newProperty.name} 
+                  onChange={(e) => setNewProperty({...newProperty, name: e.target.value})} 
+                  required 
+                  placeholder="Bijv. Zonnewende 12" 
+                />
               </div>
               <div className="form-group">
                 <label>Adres</label>
-                <input type="text" value={newProperty.address} onChange={(e) => setNewProperty({...newProperty, address: e.target.value})} placeholder="Straat, nummer, stad" />
+                <input 
+                  type="text" 
+                  value={newProperty.address} 
+                  onChange={(e) => setNewProperty({...newProperty, address: e.target.value})} 
+                  placeholder="Straat, nummer, stad" 
+                />
               </div>
               <div className="form-group">
                 <label>Verhuurder *</label>
@@ -513,7 +615,12 @@ function Admin() {
             <p className="delete-warning">Deze actie kan niet ongedaan worden gemaakt.</p>
             <div className="modal-buttons">
               <button onClick={() => setDeleteConfirm(null)} className="cancel-btn">Annuleren</button>
-              <button onClick={() => deleteConfirm.type === 'user' ? handleDeleteUser(deleteConfirm.id, deleteConfirm.name) : handleDeleteProperty(deleteConfirm.id, deleteConfirm.name)} className="delete-confirm-btn">Verwijderen</button>
+              <button 
+                onClick={() => handleDeleteUser(deleteConfirm.id, deleteConfirm.name)} 
+                className="delete-confirm-btn"
+              >
+                Verwijderen
+              </button>
             </div>
           </div>
         </div>
