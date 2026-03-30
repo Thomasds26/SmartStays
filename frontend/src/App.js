@@ -8,7 +8,7 @@ import Dashboard from './pages/Dashboard';
 import Admin from './pages/Admin';
 import CleanerDashboard from './pages/CleanerDashboard';
 import Contact from './pages/Contact';
-import SmartStaysLogo from './components/SmartStaysLogo';
+import Pricing from './pages/Pricing';
 import './App.css';
 
 function App() {
@@ -53,6 +53,7 @@ function App() {
         <Route path="/splash" element={<Splash />} />
         <Route path="/login" element={<Login />} />
         <Route path="/contact" element={<Contact />} />
+        <Route path="/pricing" element={<Pricing />} />
         <Route path="/activate/:token" element={<Activate />} />
         <Route 
           path="/dashboard" 

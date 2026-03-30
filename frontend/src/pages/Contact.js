@@ -1,18 +1,29 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import SmartStaysLogo from '../components/SmartStaysLogo';
 import './Contact.css';
 
 function Contact() {
+  const location = useLocation();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [message, setMessage] = useState('');
+  const [packageType, setPackageType] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     document.title = 'SmartStays - Contact';
-  }, []);
+    
+    // Check of er een pakket is meegegeven via URL
+    const params = new URLSearchParams(location.search);
+    const pkg = params.get('package');
+    if (pkg) {
+      setPackageType(pkg);
+      setMessage(`Ik ben geïnteresseerd in het ${pkg} pakket.`);
+    }
+  }, [location]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -23,7 +34,7 @@ function Contact() {
     }
     
     setError('');
-    console.log('Offerte aanvraag:', { name, email, phone, message });
+    console.log('Offerte aanvraag:', { name, email, phone, packageType, message });
     setSubmitted(true);
     setTimeout(() => setSubmitted(false), 5000);
   };
@@ -38,7 +49,7 @@ function Contact() {
           </div>
           <div className="success-message">
             <p>Bedankt voor je aanvraag!</p>
-            <p>We nemen zo snel mogelijk contact met je op.</p>
+            <p>We nemen zo snel mogelijk contact met je op om een afspraak te maken.</p>
           </div>
         </div>
       </div>
@@ -50,13 +61,13 @@ function Contact() {
       <div className="contact-card">
         <div className="contact-header">
           <h1><SmartStaysLogo /></h1>
-          <p>Vraag een offerte aan</p>
+          <p>Vraag een vrijblijvende offerte aan</p>
         </div>
         
         <div className="promo-info">
           <div>
-            <strong>€50 korting op je smart lock + gratis installatie!</strong>
-            <p>Bij afname van SmartStays ontvang je een Nuki Smart Lock met korting en gratis installatie.</p>
+            <strong>We komen langs voor een offerte!</strong>
+            <p>Tijdens een vrijblijvend bezoek bekijken we jouw woning en bespreken we de mogelijkheden.</p>
           </div>
         </div>
         
@@ -91,12 +102,32 @@ function Contact() {
           </div>
           
           <div className="form-group">
+            <label>Adres (optioneel)</label>
+            <input
+              type="text"
+              placeholder="Straat, nummer, stad"
+            />
+          </div>
+          
+          <div className="form-group">
+            <label>Type woning *</label>
+            <select required>
+              <option value="">Selecteer type</option>
+              <option value="studio">Studio / klein appartement (tot 50 m²)</option>
+              <option value="appartement1">Appartement (1 slaapkamer, tot 80 m²)</option>
+              <option value="appartement2">Appartement / woning (2 slaapkamers, tot 120 m²)</option>
+              <option value="woning">Grote woning (tot 150 m²)</option>
+              <option value="villa">Extra grote woning / villa (150+ m²)</option>
+            </select>
+          </div>
+          
+          <div className="form-group">
             <label>Bericht</label>
             <textarea
               rows="4"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Hoe kunnen we je helpen?"
+              placeholder="Extra informatie over je woning of wensen..."
               maxLength="500"
             />
             <div className="char-counter">

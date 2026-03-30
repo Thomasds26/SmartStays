@@ -59,7 +59,10 @@ function Home() {
             <h3>€50 korting op je smart lock + gratis installatie!</h3>
             <p>Bij afname van SmartStays ontvang je een Smart Lock met €50 korting en laten wij het gratis voor je installeren.</p>
           </div>
-          <Link to="/contact" className="promo-btn">Vraag offerte aan</Link>
+          <div className="promo-buttons">
+            <Link to="/contact" className="promo-btn">Vraag offerte aan</Link>
+            <Link to="/pricing" className="promo-btn secondary">Ontdek aanbod</Link>
+          </div>
         </div>
       </section>
 
