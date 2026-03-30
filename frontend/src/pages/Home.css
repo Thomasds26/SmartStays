@@ -12,10 +12,40 @@
   text-align: center;
 }
 
-.hero-content h1 {
-  color: #1e88e5;
-  font-size: 40px;
+.hero-content {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* Logo styling */
+.hero-logo {
+  margin-bottom: 20px;
+}
+
+.hero-logo-img {
+  width: 100px;
+  height: auto;
+  animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* SmartStays tekst */
+.smartstays-title-wrapper {
   margin-bottom: 16px;
+}
+
+.smartstays-logo.hero-logo-text {
+  font-size: 56px;
   font-weight: bold;
 }
 
@@ -23,6 +53,7 @@
   font-size: 20px;
   color: #333;
   margin-bottom: 16px;
+  font-weight: 500;
 }
 
 .description {
@@ -55,68 +86,28 @@
   box-shadow: 0 6px 16px rgba(30, 136, 229, 0.4);
 }
 
-/* Mockup - alleen zichtbaar op tablet/desktop */
+/* Cloud image */
 .hero-image {
   margin-top: 40px;
   display: none;
 }
 
-.mockup {
-  background: white;
-  border-radius: 24px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-  max-width: 400px;
-  margin: 0 auto;
+.cloud-image {
+  max-width: 100%;
+  height: auto;
+  animation: float 3s ease-in-out infinite;
 }
 
-.mockup-header {
-  background: #1e88e5;
-  color: white;
-  padding: 12px 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 600;
-}
-
-.mockup-badge {
-  background: rgba(255, 255, 255, 0.2);
-  padding: 4px 8px;
-  border-radius: 20px;
-  font-size: 12px;
-}
-
-.mockup-content {
-  padding: 20px;
-  background: #f8fafc;
-}
-
-.calendar-demo, .lock-demo {
-  background: white;
-  border-radius: 12px;
-  padding: 12px 16px;
-  margin-bottom: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.demo-date {
-  font-weight: 600;
-  color: #1e88e5;
-  margin-bottom: 4px;
-}
-
-.demo-guest, .demo-status {
-  font-size: 13px;
-  color: #666;
-}
-
-.demo-code {
-  font-family: monospace;
-  font-size: 18px;
-  font-weight: 600;
-  color: #2e7d32;
-  margin-bottom: 4px;
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
 }
 
 /* Promotie banner */
@@ -196,7 +187,6 @@
 }
 
 .feature-icon {
-  font-size: 48px;
   margin-bottom: 16px;
 }
 
@@ -240,10 +230,11 @@
   .hero-content {
     flex: 1;
     max-width: 500px;
+    margin: 0;
   }
   
-  .hero-content h1 {
-    font-size: 52px;
+  .smartstays-logo.hero-logo-text {
+    font-size: 72px;
   }
   
   .tagline {
@@ -298,6 +289,10 @@
     padding: 100px 80px;
   }
   
+  .smartstays-logo.hero-logo-text {
+    font-size: 84px;
+  }
+  
   .features {
     padding: 80px 80px;
   }
@@ -315,66 +310,43 @@
   }
 }
 
-/* Home.css - voeg toe aan bestaande CSS */
-
-.hero-image {
-  margin-top: 40px;
-  display: none;
-}
-
-.cloud-image {
-  max-width: 100%;
-  height: auto;
-  animation: float 3s ease-in-out infinite;
-}
-
-@keyframes float {
-  0% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-15px);
-  }
-  100% {
-    transform: translateY(0px);
-  }
-}
-
-/* Tablet */
-@media (min-width: 768px) {
+/* Kleine schermen */
+@media (max-width: 480px) {
   .hero {
-    padding: 80px 40px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    text-align: left;
-    max-width: 1200px;
-    margin: 0 auto;
+    padding: 40px 16px;
   }
   
-  .hero-content {
-    flex: 1;
-    max-width: 500px;
-  }
-  
-  .hero-content h1 {
-    font-size: 52px;
+  .smartstays-logo.hero-logo-text {
+    font-size: 40px;
   }
   
   .tagline {
-    font-size: 24px;
+    font-size: 18px;
   }
   
   .description {
-    font-size: 18px;
-    margin-left: 0;
-    margin-right: 0;
+    font-size: 14px;
   }
   
-  .hero-image {
-    display: block;
-    flex: 1;
-    margin-top: 0;
-    margin-left: 40px;
+  .cta-btn {
+    padding: 12px 24px;
+    font-size: 16px;
+  }
+  
+  .promo-banner {
+    margin: 16px;
+    padding: 20px;
+  }
+  
+  .promo-text h3 {
+    font-size: 18px;
+  }
+  
+  .features h2 {
+    font-size: 24px;
+  }
+  
+  .hero-logo-img {
+    width: 70px;
   }
 }

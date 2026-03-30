@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import SmartStaysLogo from '../components/SmartStaysLogo';
 import './Activate.css';
 
 function Activate() {
@@ -12,7 +13,7 @@ function Activate() {
   const [personalCode, setPersonalCode] = useState('');
   const [confirmPersonalCode, setConfirmPersonalCode] = useState('');
   const [message, setMessage] = useState('');
-  const [messageType, setMessageType] = useState(''); // 'error' of 'success'
+  const [messageType, setMessageType] = useState('');
   const [loading, setLoading] = useState(false);
   const [role, setRole] = useState('');
 
@@ -115,7 +116,7 @@ function Activate() {
     <div className="activate-container">
       <div className="activate-card">
         <div className="activate-header">
-          <h1>SmartStays</h1>
+          <h1><SmartStaysLogo /></h1>
           <p>Activeer je {role === 'SCHOONMAKER' ? 'schoonmaker' : ''} account</p>
         </div>
         

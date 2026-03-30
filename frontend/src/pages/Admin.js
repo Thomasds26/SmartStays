@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import SmartStaysLogo from '../components/SmartStaysLogo';
 import './Admin.css';
 
 function Admin() {
@@ -391,7 +392,9 @@ const handleDeleteProperty = async (propertyId, propertyName) => {
   return (
     <div className="admin-container">
       <nav className="admin-nav">
-        <div className="nav-brand">SmartStays</div>
+      <div className="nav-brand">
+        <SmartStaysLogo className="nav-logo" />
+      </div>
         <div className="nav-user">
           <span>Welkom, {user.name}</span>
           <button onClick={handleLogout} className="logout-btn">Uitloggen</button>

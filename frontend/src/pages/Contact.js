@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import SmartStaysLogo from '../components/SmartStaysLogo';
 import './Contact.css';
 
 function Contact() {
@@ -22,7 +23,6 @@ function Contact() {
     }
     
     setError('');
-    // Hier komt later de echte API call
     console.log('Offerte aanvraag:', { name, email, phone, message });
     setSubmitted(true);
     setTimeout(() => setSubmitted(false), 5000);
@@ -33,7 +33,7 @@ function Contact() {
       <div className="contact-container">
         <div className="contact-card">
           <div className="contact-header">
-            <h1>SmartStays</h1>
+            <h1><SmartStaysLogo /></h1>
             <p>Offerte aangevraagd</p>
           </div>
           <div className="success-message">
@@ -49,7 +49,7 @@ function Contact() {
     <div className="contact-container">
       <div className="contact-card">
         <div className="contact-header">
-          <h1>SmartStays</h1>
+          <h1><SmartStaysLogo /></h1>
           <p>Vraag een offerte aan</p>
         </div>
         

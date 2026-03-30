@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import PropertyCalendar from '../components/PropertyCalendar';
+import SmartStaysLogo from '../components/SmartStaysLogo';
 import './Dashboard.css';
 
 function Dashboard() {
@@ -230,7 +231,9 @@ function Dashboard() {
   return (
     <div className="dashboard-container">
       <nav className="dashboard-nav">
-        <div className="nav-brand">SmartStays</div>
+        <div className="nav-brand">
+          <SmartStaysLogo className="nav-logo" />
+        </div>
         <div className="nav-user">
           <span>Welkom, {user.name}</span>
           <button onClick={handleLogout} className="logout-btn">Uitloggen</button>
@@ -402,6 +405,9 @@ function Dashboard() {
                   placeholder="123456" 
                   maxLength="6"
                   className="code-input"
+                  autoComplete="off"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
                 />
               </div>
               <div className="form-group">
@@ -413,6 +419,9 @@ function Dashboard() {
                   placeholder="123456" 
                   maxLength="6"
                   className="code-input"
+                  autoComplete="off"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
                 />
               </div>
               {codeError && <div className="error-message">{codeError}</div>}
@@ -453,6 +462,9 @@ function Dashboard() {
                   placeholder="123456" 
                   maxLength="6"
                   className="code-input"
+                  autoComplete="off"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
                 />
               </div>
               <div className="form-group">
@@ -464,6 +476,9 @@ function Dashboard() {
                   placeholder="123456" 
                   maxLength="6"
                   className="code-input"
+                  autoComplete="off"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
                 />
               </div>
               {codeError && <div className="error-message">{codeError}</div>}

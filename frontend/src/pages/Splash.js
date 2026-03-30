@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import SmartStaysLogo from '../components/SmartStaysLogo';
 import './Splash.css';
 
 function Splash() {
@@ -10,7 +11,7 @@ function Splash() {
     
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
-    const isNative = localStorage.getItem('isNativeApp') === 'true';
+    const platform = localStorage.getItem('platform');
     
     setTimeout(() => {
       if (token && userData) {
@@ -20,6 +21,8 @@ function Splash() {
             navigate('/admin');
           } else if (user.role === 'VERHUURDER') {
             navigate('/dashboard');
+          } else if (user.role === 'SCHOONMAKER') {
+            navigate('/cleaner');
           } else {
             navigate('/login');
           }
@@ -27,8 +30,11 @@ function Splash() {
           navigate('/login');
         }
       } else {
-        // Niet ingelogd: altijd naar login voor native app
-        navigate('/login');
+        if (platform === 'mobile') {
+          navigate('/login');
+        } else {
+          navigate('/');
+        }
       }
     }, 1500);
   }, [navigate]);
@@ -37,12 +43,11 @@ function Splash() {
     <div className="splash-container">
       <div className="splash-content">
         <div className="splash-logo">
-          <svg width="80" height="80" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="100" height="100" rx="20" fill="#1e88e5"/>
-            <text x="50" y="68" fontSize="48" textAnchor="middle" fill="white" fontFamily="Arial, sans-serif" fontWeight="bold">S</text>
-          </svg>
+          <img src="/logo.png" alt="SmartStays" className="splash-logo-img" />
         </div>
-        <h1>SmartStays</h1>
+        <div className="splash-title">
+          <SmartStaysLogo className="splash-logo-text" />
+        </div>
         <div className="spinner"></div>
       </div>
     </div>

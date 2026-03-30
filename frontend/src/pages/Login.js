@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import './Login.css';
+import SmartStaysLogo from '../components/SmartStaysLogo';
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -15,7 +16,6 @@ function Login() {
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
     
-    // Al ingelogd? Ga direct door
     if (token && userData) {
       try {
         const user = JSON.parse(userData);
@@ -45,7 +45,6 @@ function Login() {
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
         
-        // Stel isNativeApp in als die nog niet bestaat
         if (localStorage.getItem('isNativeApp') === null) {
           const urlParams = new URLSearchParams(window.location.search);
           const isNative = urlParams.get('native') === 'true';
@@ -73,7 +72,7 @@ function Login() {
     <div className="login-container">
       <div className="login-card">
         <div className="login-header">
-          <h1>SmartStays</h1>
+          <h1><SmartStaysLogo /></h1>
           <p>Log in op je account</p>
         </div>
         
@@ -107,7 +106,6 @@ function Login() {
           </button>
         </form>
         
-        {/* Alleen voor web (niet native app) de link naar offerte */}
         {!isNative && (
           <div className="login-footer">
             <p className="no-account">

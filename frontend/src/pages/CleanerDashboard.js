@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import SmartStaysLogo from '../components/SmartStaysLogo';
 import './CleanerDashboard.css';
 
 function CleanerDashboard() {
@@ -141,14 +142,11 @@ function CleanerDashboard() {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      
-      // API call om persoonlijke code te updaten in database
       const response = await axios.put('http://localhost:3000/api/cleaner/personal-code', 
         { personalCode: newPersonalCode },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       
-      // Update local user data
       const updatedUser = response.data.user;
       localStorage.setItem('user', JSON.stringify(updatedUser));
       setUser(updatedUser);
@@ -195,7 +193,9 @@ function CleanerDashboard() {
   return (
     <div className="cleaner-container">
       <nav className="cleaner-nav">
-        <div className="nav-brand">SmartStays</div>
+        <div className="nav-brand">
+          <SmartStaysLogo className="nav-logo" />
+        </div>
         <div className="nav-user">
           <span>Welkom, {user.name}</span>
           <button onClick={handleLogout} className="logout-btn">Uitloggen</button>

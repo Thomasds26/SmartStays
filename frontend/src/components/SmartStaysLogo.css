@@ -1,0 +1,44 @@
+.smartstays-logo {
+  font-weight: bold;
+  display: inline-block;
+}
+
+.smartstays-logo .smart {
+  color: #1e88e5;
+}
+
+.smartstays-logo .stays {
+  color: #0a2b4a;
+}
+
+/* Splash screen variant - witte tekst */
+.smartstays-logo.splash-logo-text .smart,
+.smartstays-logo.splash-logo-text .stays {
+  color: white;
+}
+
+/* Hero variant - grotere tekst */
+.smartstays-logo.hero-logo-text {
+  font-size: 56px;
+}
+
+/* Nav variant */
+.smartstays-logo.nav-logo {
+  font-size: 20px;
+}
+
+@media (min-width: 768px) {
+  .smartstays-logo.hero-logo-text {
+    font-size: 72px;
+  }
+  
+  .smartstays-logo.nav-logo {
+    font-size: 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .smartstays-logo.hero-logo-text {
+    font-size: 84px;
+  }
+}

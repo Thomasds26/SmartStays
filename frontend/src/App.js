@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import Admin from './pages/Admin';
 import CleanerDashboard from './pages/CleanerDashboard';
 import Contact from './pages/Contact';
+import SmartStaysLogo from './components/SmartStaysLogo';
 import './App.css';
 
 function App() {

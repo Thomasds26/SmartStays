@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import './Home.css';
+import SmartStaysLogo from '../components/SmartStaysLogo';
 
 function Home() {
   const navigate = useNavigate();
@@ -33,11 +34,16 @@ function Home() {
       {/* Hero sectie met cloud afbeelding */}
       <section className="hero">
         <div className="hero-content">
-          <h1>SmartStays</h1>
+          <div className="hero-logo">
+            <img src="/logo.png" alt="SmartStays" className="hero-logo-img" />
+          </div>
+          <div className="smartstays-title-wrapper">
+            <SmartStaysLogo className="hero-logo-text" />
+          </div>
           <p className="tagline">Slim toegangsbeheer voor vakantieverhuur</p>
           <p className="description">
-            Automatisch codes voor Airbnb en Booking.com.<br />
-            Beheer slimme sloten, boekingen en kuisdiensten vanaf één platform.
+            Automatisch toegangbeheer voor Airbnb en Booking.com.<br />
+            Beheer slimme sloten, boekingen en schoonmaakdiensten vanaf één platform.
           </p>
           <button onClick={goToLogin} className="cta-btn">Start nu</button>
         </div>
@@ -51,7 +57,7 @@ function Home() {
         <div className="promo-content">
           <div className="promo-text">
             <h3>€50 korting op je smart lock + gratis installatie!</h3>
-            <p>Bij afname van SmartStays ontvang je een Nuki Smart Lock met €50 korting en laten wij het gratis voor je installeren.</p>
+            <p>Bij afname van SmartStays ontvang je een Smart Lock met €50 korting en laten wij het gratis voor je installeren.</p>
           </div>
           <Link to="/contact" className="promo-btn">Vraag offerte aan</Link>
         </div>
@@ -69,7 +75,7 @@ function Home() {
               </svg>
             </div>
             <h3>Automatische codes</h3>
-            <p>Genereer unieke codes voor elke gast en kuisdienst</p>
+            <p>Genereer unieke codes voor elke gast en schoonmaaksdienst om veiligheid te garanderen</p>
           </div>
           <div className="feature-card">
             <div className="feature-icon">
@@ -88,8 +94,8 @@ function Home() {
                 <circle cx="12" cy="12" r="3" stroke="#1e88e5" strokeWidth="1.5" fill="none"/>
               </svg>
             </div>
-            <h3>Kuisdienst planning</h3>
-            <p>Plan en beheer kuismomenten automatisch</p>
+            <h3>Schoonmaakdienst planning</h3>
+            <p>Schoonmaakmomenten worden automatisch beheerd op basis van boekingen</p>
           </div>
           <div className="feature-card">
             <div className="feature-icon">
