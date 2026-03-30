@@ -627,3 +627,20 @@
     grid-template-columns: 1fr;
   }
 }
+
+.no-property-selected {
+  text-align: center;
+  padding: 60px 20px;
+  background: white;
+  border-radius: 16px;
+  margin-bottom: 24px;
+}
+
+.no-property-selected h2 {
+  color: #1e88e5;
+  margin-bottom: 12px;
+}
+
+.no-property-selected p {
+  color: #666;
+}

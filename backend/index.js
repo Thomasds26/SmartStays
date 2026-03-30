@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const { Pool } = require('pg');
 const crypto = require('crypto');
+const ical = require('ical');
 
 const app = express();
 const PORT = 3000;
@@ -78,7 +79,7 @@ const checkOwnerOrAdmin = (req, res, next) => {
 
 // ============ PUBLIC ENDPOINTS ============
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'SmartStays API werkt 🚀' });
+  res.json({ status: 'ok', message: 'SmartStays API werkt' });
 });
 
 app.post('/api/login', async (req, res) => {
@@ -90,7 +91,7 @@ app.post('/api/login', async (req, res) => {
 
   try {
     const result = await pool.query(
-      'SELECT id, email, name, role, password, "isActive" FROM "User" WHERE email = $1',
+      'SELECT id, email, name, role, password, "isActive", "personalCode" FROM "User" WHERE email = $1',
       [email]
     );
 
@@ -131,7 +132,6 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// Check activation token voor rol
 app.post('/api/check-activation', async (req, res) => {
   const { token } = req.body;
   
@@ -231,7 +231,7 @@ app.post('/api/users', verifyToken, checkActiveUser, checkAdmin, async (req, res
       [email, role, activationToken]
     );
     
-    console.log(`\n📧 ========== ACTIVATIE LINK ==========`);
+    console.log(`\n========== ACTIVATIE LINK ==========`);
     console.log(`Email: ${email}`);
     console.log(`Rol: ${role}`);
     console.log(`Link: http://localhost:3001/activate/${activationToken}`);
@@ -245,6 +245,57 @@ app.post('/api/users', verifyToken, checkActiveUser, checkAdmin, async (req, res
   } catch (error) {
     console.error('Fout bij toevoegen gebruiker:', error);
     res.status(500).json({ error: 'Gebruiker kon niet worden toegevoegd' });
+  }
+});
+
+app.put('/api/users/:id', verifyToken, checkActiveUser, checkAdmin, async (req, res) => {
+  const userId = req.params.id;
+  const { name, email, role } = req.body;
+  
+  if (!name && !email && !role) {
+    return res.status(400).json({ error: 'Minstens één veld om te updaten' });
+  }
+  
+  try {
+    // Check of gebruiker bestaat
+    const userExists = await pool.query(
+      'SELECT id FROM "User" WHERE id = $1',
+      [userId]
+    );
+    
+    if (userExists.rows.length === 0) {
+      return res.status(404).json({ error: 'Gebruiker niet gevonden' });
+    }
+    
+    // Bouw de update query dynamisch
+    const updates = [];
+    const values = [];
+    let paramIndex = 1;
+    
+    if (name) {
+      updates.push(`name = $${paramIndex++}`);
+      values.push(name);
+    }
+    if (email) {
+      updates.push(`email = $${paramIndex++}`);
+      values.push(email);
+    }
+    if (role) {
+      updates.push(`role = $${paramIndex++}`);
+      values.push(role);
+    }
+    
+    values.push(userId);
+    
+    const result = await pool.query(
+      `UPDATE "User" SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING id, email, name, role, "isActive", "createdAt"`,
+      values
+    );
+    
+    res.json({ success: true, user: result.rows[0] });
+  } catch (error) {
+    console.error('Fout bij updaten gebruiker:', error);
+    res.status(500).json({ error: 'Kon gebruiker niet updaten' });
   }
 });
 
@@ -278,11 +329,15 @@ app.delete('/api/users/:id', verifyToken, checkActiveUser, checkAdmin, async (re
   }
 });
 
-// Admin: Haal alle properties op
 app.get('/api/admin/properties', verifyToken, checkActiveUser, checkAdmin, async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT p.id, p.name, p.address, p."ownerId", u.email as owner_email, u.name as owner_name
+      SELECT p.id, p.name, p.address, p."ownerId", 
+             p."cleaningDuration",
+             p."airbnbIcalUrl",
+             p."bookingIcalUrl",
+             u.email as owner_email, u.name as owner_name,
+             p."createdAt"
       FROM "Property" p
       LEFT JOIN "User" u ON p."ownerId" = u.id
       ORDER BY p."createdAt" DESC
@@ -294,9 +349,8 @@ app.get('/api/admin/properties', verifyToken, checkActiveUser, checkAdmin, async
   }
 });
 
-// Admin: Voeg property toe
 app.post('/api/admin/properties', verifyToken, checkActiveUser, checkAdmin, async (req, res) => {
-  const { name, address, ownerId } = req.body;
+  const { name, address, ownerId, cleaningDuration, airbnbIcalUrl, bookingIcalUrl } = req.body;
   
   if (!name || !ownerId) {
     return res.status(400).json({ error: 'Naam en verhuurder zijn verplicht' });
@@ -313,9 +367,19 @@ app.post('/api/admin/properties', verifyToken, checkActiveUser, checkAdmin, asyn
     }
     
     const result = await pool.query(
-      'INSERT INTO "Property" (id, name, address, "ownerId", "createdAt") VALUES (gen_random_uuid()::text, $1, $2, $3, NOW()) RETURNING id, name, address, "ownerId"',
-      [name, address || null, ownerId]
+      `INSERT INTO "Property" (id, name, address, "ownerId", "cleaningDuration", "airbnbIcalUrl", "bookingIcalUrl", "createdAt") 
+       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, NOW()) 
+       RETURNING id, name, address, "ownerId", "cleaningDuration", "airbnbIcalUrl", "bookingIcalUrl"`,
+      [name, address || null, ownerId, cleaningDuration || 90, airbnbIcalUrl || null, bookingIcalUrl || null]
     );
+    
+    // Start synchronisatie als er iCal URLs zijn
+    if (airbnbIcalUrl) {
+      await syncCalendarEvents(result.rows[0].id, 'AIRBNB', airbnbIcalUrl);
+    }
+    if (bookingIcalUrl) {
+      await syncCalendarEvents(result.rows[0].id, 'BOOKING', bookingIcalUrl);
+    }
     
     res.json({ success: true, property: result.rows[0] });
   } catch (error) {
@@ -324,13 +388,85 @@ app.post('/api/admin/properties', verifyToken, checkActiveUser, checkAdmin, asyn
   }
 });
 
-// Admin: Verwijder property
+app.put('/api/admin/properties/:id', verifyToken, checkActiveUser, checkAdmin, async (req, res) => {
+  const propertyId = req.params.id;
+  const { name, address, ownerId, cleaningDuration, airbnbIcalUrl, bookingIcalUrl } = req.body;
+  
+  try {
+    // Check of property bestaat
+    const propertyExists = await pool.query(
+      'SELECT id FROM "Property" WHERE id = $1',
+      [propertyId]
+    );
+    
+    if (propertyExists.rows.length === 0) {
+      return res.status(404).json({ error: 'Property niet gevonden' });
+    }
+    
+    // Bouw de update query dynamisch
+    const updates = [];
+    const values = [];
+    let paramIndex = 1;
+    
+    if (name !== undefined) {
+      updates.push(`name = $${paramIndex++}`);
+      values.push(name);
+    }
+    if (address !== undefined) {
+      updates.push(`address = $${paramIndex++}`);
+      values.push(address);
+    }
+    if (ownerId !== undefined) {
+      updates.push(`"ownerId" = $${paramIndex++}`);
+      values.push(ownerId);
+    }
+    if (cleaningDuration !== undefined) {
+      updates.push(`"cleaningDuration" = $${paramIndex++}`);
+      values.push(cleaningDuration);
+    }
+    if (airbnbIcalUrl !== undefined) {
+      updates.push(`"airbnbIcalUrl" = $${paramIndex++}`);
+      values.push(airbnbIcalUrl || null);
+    }
+    if (bookingIcalUrl !== undefined) {
+      updates.push(`"bookingIcalUrl" = $${paramIndex++}`);
+      values.push(bookingIcalUrl || null);
+    }
+    
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'Geen velden om te updaten' });
+    }
+    
+    values.push(propertyId);
+    
+    const result = await pool.query(
+      `UPDATE "Property" SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+      values
+    );
+    
+    // Start synchronisatie als iCal URLs gewijzigd zijn
+    if (airbnbIcalUrl !== undefined && airbnbIcalUrl) {
+      await syncCalendarEvents(propertyId, 'AIRBNB', airbnbIcalUrl);
+    }
+    if (bookingIcalUrl !== undefined && bookingIcalUrl) {
+      await syncCalendarEvents(propertyId, 'BOOKING', bookingIcalUrl);
+    }
+    
+    res.json({ success: true, property: result.rows[0] });
+  } catch (error) {
+    console.error('Fout bij updaten property:', error);
+    res.status(500).json({ error: 'Property kon niet worden bijgewerkt' });
+  }
+});
+
 app.delete('/api/admin/properties/:id', verifyToken, checkActiveUser, checkAdmin, async (req, res) => {
   const propertyId = req.params.id;
   
   try {
     await pool.query('DELETE FROM "Booking" WHERE "propertyId" = $1', [propertyId]);
     await pool.query('DELETE FROM "CleaningTask" WHERE "propertyId" = $1', [propertyId]);
+    await pool.query('DELETE FROM "Integration" WHERE "propertyId" = $1', [propertyId]);
+    await pool.query('DELETE FROM "CalendarEvent" WHERE "propertyId" = $1', [propertyId]);
     await pool.query('DELETE FROM "Property" WHERE id = $1', [propertyId]);
     res.json({ success: true, message: 'Property verwijderd' });
   } catch (error) {
@@ -339,38 +475,197 @@ app.delete('/api/admin/properties/:id', verifyToken, checkActiveUser, checkAdmin
   }
 });
 
-// Admin: Voeg schoonmaak taak toe
-app.post('/api/admin/cleaning-tasks', verifyToken, checkActiveUser, checkAdmin, async (req, res) => {
-  const { propertyId, scheduledAt, duration, notes } = req.body;
-  
-  if (!propertyId || !scheduledAt) {
-    return res.status(400).json({ error: 'Property en datum zijn verplicht' });
-  }
-  
+// ============ KALENDER INTEGRATIE ============
+
+// Genereer schoonmaak taken
+const generateCleaningTasksForProperty = async (propertyId) => {
   try {
-    const result = await pool.query(
-      'INSERT INTO "CleaningTask" (id, "propertyId", "scheduledAt", duration, notes, status, "createdAt") VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, NOW()) RETURNING *',
-      [propertyId, scheduledAt, duration || 60, notes || null, 'OPEN']
+    const bookings = await pool.query(
+      `SELECT ce.* FROM "CalendarEvent" ce 
+       WHERE ce."propertyId" = $1 
+       AND ce.status = 'ACTIVE' 
+       AND ce."checkOut" >= CURRENT_DATE
+       ORDER BY ce."checkIn" ASC`,
+      [propertyId]
     );
     
-    res.json({ success: true, task: result.rows[0] });
+    if (bookings.rows.length === 0) return;
+    
+    const property = await pool.query(
+      'SELECT "cleaningDuration" FROM "Property" WHERE id = $1',
+      [propertyId]
+    );
+    const cleaningDuration = property.rows[0]?.cleaningDuration || 90;
+    
+    await pool.query(
+      'DELETE FROM "CleaningTask" WHERE "propertyId" = $1 AND "scheduledAt" >= CURRENT_DATE',
+      [propertyId]
+    );
+    
+    for (let i = 0; i < bookings.rows.length; i++) {
+      const currentBooking = bookings.rows[i];
+      const checkOut = new Date(currentBooking.checkOut);
+      
+      let cleaningStart = new Date(checkOut);
+      cleaningStart.setHours(12, 0, 0, 0);
+      
+      await pool.query(
+        `INSERT INTO "CleaningTask" (id, "propertyId", "scheduledAt", duration, status, "createdAt")
+         VALUES (gen_random_uuid()::text, $1, $2, $3, $4, NOW())`,
+        [propertyId, cleaningStart, cleaningDuration, 'OPEN']
+      );
+    }
+    
+    console.log(`Schoonmaak taken gegenereerd voor property ${propertyId}`);
   } catch (error) {
-    console.error('Fout bij toevoegen taak:', error);
-    res.status(500).json({ error: 'Taak kon niet worden toegevoegd' });
+    console.error('Fout bij genereren schoonmaak taken:', error);
   }
+};
+
+// WebSocket voor real-time updates
+const WebSocket = require('ws');
+const wss = new WebSocket.Server({ port: 3002 });
+
+const clients = new Set();
+
+wss.on('connection', (ws) => {
+  clients.add(ws);
+  console.log('Client connected, total clients:', clients.size);
+  
+  ws.on('close', () => {
+    clients.delete(ws);
+    console.log('Client disconnected, total clients:', clients.size);
+  });
+  
+  ws.on('error', (error) => {
+    console.error('WebSocket error:', error);
+  });
 });
 
-// Admin: Verwijder schoonmaak taak
-app.delete('/api/admin/cleaning-tasks/:id', verifyToken, checkActiveUser, checkAdmin, async (req, res) => {
-  const taskId = req.params.id;
+const broadcastUpdate = (type, data) => {
+  const message = JSON.stringify({ type, data, timestamp: new Date().toISOString() });
+  clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(message);
+    }
+  });
+};
+
+// Synchroniseer kalender events
+const syncCalendarEvents = async (propertyId, platform, icalUrl) => {
+  if (!icalUrl) return { success: false, error: 'Geen iCal URL' };
   
   try {
-    await pool.query('DELETE FROM "CleaningReserve" WHERE "taskId" = $1', [taskId]);
-    await pool.query('DELETE FROM "CleaningTask" WHERE id = $1', [taskId]);
-    res.json({ success: true, message: 'Taak verwijderd' });
+    const response = await fetch(icalUrl);
+    const icalData = await response.text();
+    const events = ical.parseICS(icalData);
+    
+    let newCount = 0;
+    let updatedCount = 0;
+    
+    for (const eventId in events) {
+      const event = events[eventId];
+      if (event.type !== 'VEVENT') continue;
+      
+      const externalId = event.uid || eventId;
+      const checkIn = new Date(event.start);
+      const checkOut = new Date(event.end);
+      const guestName = event.summary || 'Gast';
+      
+      const existing = await pool.query(
+        'SELECT id FROM "CalendarEvent" WHERE "externalId" = $1 AND platform = $2',
+        [externalId, platform]
+      );
+      
+      if (existing.rows.length === 0) {
+        await pool.query(
+          `INSERT INTO "CalendarEvent" (id, "externalId", "propertyId", platform, "guestName", "checkIn", "checkOut", status, "createdAt", "updatedAt")
+           VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`,
+          [externalId, propertyId, platform, guestName, checkIn, checkOut, 'ACTIVE']
+        );
+        newCount++;
+      } else {
+        await pool.query(
+          `UPDATE "CalendarEvent" SET "guestName" = $1, "checkIn" = $2, "checkOut" = $3, "updatedAt" = NOW()
+           WHERE "externalId" = $4 AND platform = $5`,
+          [guestName, checkIn, checkOut, externalId, platform]
+        );
+        updatedCount++;
+      }
+    }
+    
+    await generateCleaningTasksForProperty(propertyId);
+    
+    broadcastUpdate('CALENDAR_SYNC', { propertyId, platform, newCount, updatedCount });
+    
+    console.log(`Sync voltooid voor ${platform}: ${newCount} nieuw, ${updatedCount} geüpdatet`);
+    return { success: true, newCount, updatedCount };
   } catch (error) {
-    console.error('Fout bij verwijderen taak:', error);
-    res.status(500).json({ error: 'Kon taak niet verwijderen' });
+    console.error(`Fout bij synchronisatie van ${platform}:`, error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Synchroniseer alle properties
+const syncAllProperties = async () => {
+  try {
+    console.log(`[${new Date().toLocaleTimeString()}] Geplande synchronisatie gestart...`);
+    
+    const properties = await pool.query(
+      'SELECT id, "airbnbIcalUrl", "bookingIcalUrl" FROM "Property"'
+    );
+    
+    for (const property of properties.rows) {
+      if (property.airbnbIcalUrl) {
+        await syncCalendarEvents(property.id, 'AIRBNB', property.airbnbIcalUrl);
+      }
+      if (property.bookingIcalUrl) {
+        await syncCalendarEvents(property.id, 'BOOKING', property.bookingIcalUrl);
+      }
+    }
+    
+    console.log(`[${new Date().toLocaleTimeString()}] Synchronisatie voltooid`);
+  } catch (error) {
+    console.error('Fout bij geplande synchronisatie:', error);
+  }
+};
+
+// Start automatische synchronisatie (elke minuut)
+setTimeout(() => {
+  syncAllProperties();
+  setInterval(syncAllProperties, 60 * 1000);
+}, 5000);
+
+// Haal kalender events op
+app.get('/api/calendar/:propertyId', verifyToken, checkActiveUser, async (req, res) => {
+  const { propertyId } = req.params;
+  const { start, end } = req.query;
+  
+  try {
+    let query = `
+      SELECT ce.*, p.name as property_name
+      FROM "CalendarEvent" ce
+      JOIN "Property" p ON ce."propertyId" = p.id
+      WHERE ce."propertyId" = $1 AND ce.status = 'ACTIVE'
+    `;
+    const params = [propertyId];
+    
+    if (start) {
+      query += ` AND ce."checkOut" >= $${params.length + 1}`;
+      params.push(start);
+    }
+    if (end) {
+      query += ` AND ce."checkIn" <= $${params.length + 1}`;
+      params.push(end);
+    }
+    
+    query += ` ORDER BY ce."checkIn" ASC`;
+    
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Fout bij ophalen kalender:', error);
+    res.status(500).json({ error: 'Kon kalender niet ophalen' });
   }
 });
 
@@ -542,8 +837,6 @@ app.delete('/api/personal-codes/:id', verifyToken, checkActiveUser, checkOwnerOr
 });
 
 // ============ SCHOONMAKER ENDPOINTS ============
-
-// Haal alle open schoonmaak taken op
 app.get('/api/cleaning-tasks', verifyToken, checkActiveUser, async (req, res) => {
   try {
     const { status } = req.query;
@@ -575,7 +868,6 @@ app.get('/api/cleaning-tasks', verifyToken, checkActiveUser, async (req, res) =>
   }
 });
 
-// Schoonmaker meldt zich aan voor taak
 app.post('/api/cleaning-tasks/:id/assign', verifyToken, checkActiveUser, async (req, res) => {
   const taskId = req.params.id;
   const cleanerId = req.userId;
@@ -606,7 +898,6 @@ app.post('/api/cleaning-tasks/:id/assign', verifyToken, checkActiveUser, async (
   }
 });
 
-// Schoonmaker zet zich als reserve voor taak
 app.post('/api/cleaning-tasks/:id/reserve', verifyToken, checkActiveUser, async (req, res) => {
   const taskId = req.params.id;
   const cleanerId = req.userId;
@@ -642,7 +933,6 @@ app.post('/api/cleaning-tasks/:id/reserve', verifyToken, checkActiveUser, async 
   }
 });
 
-// Schoonmaker haalt zijn eigen taken op
 app.get('/api/my-tasks', verifyToken, checkActiveUser, async (req, res) => {
   try {
     const result = await pool.query(`
@@ -663,7 +953,6 @@ app.get('/api/my-tasks', verifyToken, checkActiveUser, async (req, res) => {
   }
 });
 
-// Schoonmaker haalt zijn reserves op
 app.get('/api/my-reserves', verifyToken, checkActiveUser, async (req, res) => {
   try {
     const result = await pool.query(`
@@ -690,7 +979,6 @@ app.get('/api/my-reserves', verifyToken, checkActiveUser, async (req, res) => {
   }
 });
 
-// Schoonmaker annuleert zijn reserve
 app.delete('/api/my-reserves/:id', verifyToken, checkActiveUser, async (req, res) => {
   const reserveId = req.params.id;
   
@@ -713,7 +1001,39 @@ app.delete('/api/my-reserves/:id', verifyToken, checkActiveUser, async (req, res
   }
 });
 
+app.put('/api/cleaner/personal-code', verifyToken, checkActiveUser, async (req, res) => {
+  const { personalCode } = req.body;
+  const userId = req.userId;
+  
+  // Check of gebruiker een schoonmaker is
+  if (req.userRole !== 'SCHOONMAKER') {
+    return res.status(403).json({ error: 'Alleen schoonmakers kunnen hun code wijzigen' });
+  }
+  
+  if (!personalCode || personalCode.length !== 6 || !/^\d{6}$/.test(personalCode)) {
+    return res.status(400).json({ error: 'Code moet exact 6 cijfers zijn' });
+  }
+  
+  try {
+    await pool.query(
+      'UPDATE "User" SET "personalCode" = $1 WHERE id = $2',
+      [personalCode, userId]
+    );
+    
+    // Haal de geüpdatete gebruiker op
+    const result = await pool.query(
+      'SELECT id, email, name, role, "isActive", "personalCode" FROM "User" WHERE id = $1',
+      [userId]
+    );
+    
+    res.json({ success: true, user: result.rows[0] });
+  } catch (error) {
+    console.error('Fout bij updaten personal code:', error);
+    res.status(500).json({ error: 'Code kon niet worden bijgewerkt' });
+  }
+});
+
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server draait op http://0.0.0.0:${PORT}`);
-  console.log(`📡 Health: http://localhost:${PORT}/api/health`);
+  console.log(`Server draait op http://0.0.0.0:${PORT}`);
+  console.log(`Health: http://localhost:${PORT}/api/health`);
 });

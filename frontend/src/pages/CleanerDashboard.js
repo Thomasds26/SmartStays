@@ -8,6 +8,11 @@ function CleanerDashboard() {
   const [openTasks, setOpenTasks] = useState([]);
   const [myTasks, setMyTasks] = useState([]);
   const [myReserves, setMyReserves] = useState([]);
+  const [personalCode, setPersonalCode] = useState('');
+  const [showCodeModal, setShowCodeModal] = useState(false);
+  const [newPersonalCode, setNewPersonalCode] = useState('');
+  const [confirmPersonalCode, setConfirmPersonalCode] = useState('');
+  const [codeError, setCodeError] = useState('');
   const [activeTab, setActiveTab] = useState('available');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -33,6 +38,7 @@ function CleanerDashboard() {
     }
     
     setUser(parsedUser);
+    setPersonalCode(parsedUser.personalCode || '••••••');
     fetchData();
     document.title = 'SmartStays - Schoonmaker Dashboard';
   }, [navigate]);
@@ -113,6 +119,54 @@ function CleanerDashboard() {
     }
   };
 
+  const validateCode = (code) => {
+    if (!/^\d{6}$/.test(code)) {
+      return 'Code moet exact 6 cijfers zijn';
+    }
+    return null;
+  };
+
+  const handleChangePersonalCode = async () => {
+    const error = validateCode(newPersonalCode);
+    if (error) {
+      setCodeError(error);
+      return;
+    }
+    
+    if (newPersonalCode !== confirmPersonalCode) {
+      setCodeError('Codes komen niet overeen');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      
+      // API call om persoonlijke code te updaten in database
+      const response = await axios.put('http://localhost:3000/api/cleaner/personal-code', 
+        { personalCode: newPersonalCode },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      
+      // Update local user data
+      const updatedUser = response.data.user;
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+      setPersonalCode(updatedUser.personalCode);
+      
+      setShowCodeModal(false);
+      setNewPersonalCode('');
+      setConfirmPersonalCode('');
+      setCodeError('');
+      setMessage('Persoonlijke code is gewijzigd!');
+      setTimeout(() => setMessage(''), 3000);
+    } catch (error) {
+      setCodeError(error.response?.data?.error || 'Fout bij wijzigen code');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogout = () => {
     const isNative = localStorage.getItem('isNativeApp') === 'true';
     localStorage.removeItem('token');
@@ -153,13 +207,16 @@ function CleanerDashboard() {
           <h1>Schoonmaker Dashboard</h1>
           <div className="tab-buttons">
             <button className={`tab-btn ${activeTab === 'available' ? 'active' : ''}`} onClick={() => setActiveTab('available')}>
-              Beschikbare taken
+              Beschikbare taken ({openTasks.length})
             </button>
             <button className={`tab-btn ${activeTab === 'my-tasks' ? 'active' : ''}`} onClick={() => setActiveTab('my-tasks')}>
-              Mijn taken
+              Mijn taken ({myTasks.length})
             </button>
             <button className={`tab-btn ${activeTab === 'reserves' ? 'active' : ''}`} onClick={() => setActiveTab('reserves')}>
               Mijn reserves ({myReserves.length})
+            </button>
+            <button className={`tab-btn ${activeTab === 'my-code' ? 'active' : ''}`} onClick={() => setActiveTab('my-code')}>
+              Mijn code
             </button>
           </div>
         </div>
@@ -252,7 +309,86 @@ function CleanerDashboard() {
             )}
           </div>
         )}
+        
+        {!loading && activeTab === 'my-code' && (
+          <div className="code-section">
+            <div className="code-card-large">
+              <div className="code-header-large">
+                <h3>Mijn persoonlijke code</h3>
+                <p className="code-description">
+                  Deze code gebruik je om toegang te krijgen tot de woningen waar je moet schoonmaken.
+                  Je kunt deze code wijzigen wanneer je wilt.
+                </p>
+              </div>
+              <div className="code-display">
+                <div className="code-value-large">{personalCode}</div>
+                <button onClick={() => setShowCodeModal(true)} className="change-code-btn-large">
+                  Code wijzigen
+                </button>
+              </div>
+              <div className="code-warning">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 8V12M12 16H12.01M3 12C3 16.97 7.03 21 12 21C16.97 21 21 16.97 21 12C21 7.03 16.97 3 12 3C7.03 3 3 7.03 3 12Z" stroke="currentColor" strokeWidth="1.5"/>
+                </svg>
+                <span>Deze code is persoonlijk en wordt niet gedeeld met anderen. Wijzig hem alleen als je zeker weet dat je de nieuwe code onthoudt.</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Modal voor code wijzigen */}
+      {showCodeModal && (
+        <div className="modal-overlay" onClick={() => setShowCodeModal(false)}>
+          <div className="modal code-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Persoonlijke code wijzigen</h2>
+              <button className="modal-close" onClick={() => setShowCodeModal(false)}>✖</button>
+            </div>
+            <div className="modal-body">
+              <div className="warning-box">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: '8px' }}>
+                  <path d="M12 8V12M12 16H12.01M3 12C3 16.97 7.03 21 12 21C16.97 21 21 16.97 21 12C21 7.03 16.97 3 12 3C7.03 3 3 7.03 3 12Z" stroke="currentColor" strokeWidth="1.5"/>
+                </svg>
+                <span>Let op: Wijzig deze code alleen als je zeker weet dat je de nieuwe code onthoudt.</span>
+              </div>
+              <div className="form-group">
+                <label>Nieuwe code (6 cijfers)</label>
+                <input 
+                  type="text" 
+                  value={newPersonalCode} 
+                  onChange={(e) => setNewPersonalCode(e.target.value.replace(/\D/g, '').slice(0, 6))} 
+                  placeholder="123456" 
+                  maxLength="6"
+                  className="code-input"
+                  autoComplete="off"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
+                />
+              </div>
+              <div className="form-group">
+                <label>Herhaal code</label>
+                <input 
+                  type="text" 
+                  value={confirmPersonalCode} 
+                  onChange={(e) => setConfirmPersonalCode(e.target.value.replace(/\D/g, '').slice(0, 6))} 
+                  placeholder="123456" 
+                  maxLength="6"
+                  className="code-input"
+                  autoComplete="off"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
+                />
+              </div>
+              {codeError && <div className="error-message">{codeError}</div>}
+            </div>
+            <div className="modal-buttons">
+              <button onClick={() => setShowCodeModal(false)} className="cancel-btn">Annuleren</button>
+              <button onClick={handleChangePersonalCode} className="submit-btn">Code wijzigen</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

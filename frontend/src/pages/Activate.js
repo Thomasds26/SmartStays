@@ -12,6 +12,7 @@ function Activate() {
   const [personalCode, setPersonalCode] = useState('');
   const [confirmPersonalCode, setConfirmPersonalCode] = useState('');
   const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState(''); // 'error' of 'success'
   const [loading, setLoading] = useState(false);
   const [role, setRole] = useState('');
 
@@ -24,6 +25,7 @@ function Activate() {
         setRole(response.data.role);
       } catch (error) {
         setMessage('Ongeldige activatie link');
+        setMessageType('error');
       }
     };
     fetchUserRole();
@@ -42,34 +44,39 @@ function Activate() {
     
     if (!name || !password) {
       setMessage('Vul alle velden in');
+      setMessageType('error');
       return;
     }
     
     if (password !== confirmPassword) {
       setMessage('Wachtwoorden komen niet overeen');
+      setMessageType('error');
       return;
     }
     
     if (password.length < 6) {
       setMessage('Wachtwoord moet minimaal 6 tekens bevatten');
+      setMessageType('error');
       return;
     }
     
     if (role === 'SCHOONMAKER') {
-      // Check of code exact 6 cijfers is
       if (!personalCode || personalCode.length !== 6) {
         setMessage('Persoonlijke code moet exact 6 cijfers zijn');
+        setMessageType('error');
         return;
       }
       
       const codeError = validateCode(personalCode);
       if (codeError) {
         setMessage(codeError);
+        setMessageType('error');
         return;
       }
       
       if (personalCode !== confirmPersonalCode) {
         setMessage('Persoonlijke codes komen niet overeen');
+        setMessageType('error');
         return;
       }
     }
@@ -84,9 +91,11 @@ function Activate() {
       });
       
       setMessage(response.data.message);
+      setMessageType('success');
       setTimeout(() => navigate('/login'), 3000);
     } catch (err) {
       setMessage(err.response?.data?.error || 'Activatie mislukt');
+      setMessageType('error');
     } finally {
       setLoading(false);
     }
@@ -156,8 +165,11 @@ function Activate() {
                   placeholder="123456"
                   maxLength="6"
                   className="code-input"
+                  autoComplete="off"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
                 />
-                <small className="code-hint">Vul exact 6 cijfers in</small>
+                <small className="code-hint">Vul exact 6 cijfers in. Dit is geen wachtwoord, maar een toegangscode voor het slot.</small>
               </div>
               
               <div className="form-group">
@@ -170,12 +182,19 @@ function Activate() {
                   placeholder="123456"
                   maxLength="6"
                   className="code-input"
+                  autoComplete="off"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
                 />
               </div>
             </>
           )}
           
-          {message && <div className="message">{message}</div>}
+          {message && (
+            <div className={`message ${messageType}`}>
+              {message}
+            </div>
+          )}
           
           <button type="submit" disabled={loading}>
             {loading ? 'Bezig...' : 'Account activeren'}

@@ -19,20 +19,25 @@ model User {
   
   properties       Property[]
   personalCodes    PersonalCode[]
-  cleaningTasks    CleaningTask[]     // taken die deze schoonmaker uitvoert
-  cleaningReserves CleaningReserve[]  // reserves voor taken
+  cleaningTasks    CleaningTask[]
+  cleaningReserves CleaningReserve[]
 }
 
 model Property {
-  id        String   @id @default(cuid())
-  name      String
-  address   String?
-  ownerId   String
-  createdAt DateTime @default(now())
+  id               String   @id @default(cuid())
+  name             String
+  address          String?
+  ownerId          String
+  cleaningDuration Int      @default(90)
+  airbnbIcalUrl    String?  // iCal URL voor Airbnb
+  bookingIcalUrl   String?  // iCal URL voor Booking.com
+  createdAt        DateTime @default(now())
   
-  owner         User           @relation(fields: [ownerId], references: [id])
-  bookings      Booking[]
-  cleaningTasks CleaningTask[] // Relatie naar schoonmaak taken
+  owner          User            @relation(fields: [ownerId], references: [id])
+  bookings       Booking[]
+  cleaningTasks  CleaningTask[]
+  integrations   Integration[]
+  calendarEvents CalendarEvent[]
 }
 
 model Booking {
@@ -45,7 +50,7 @@ model Booking {
   checkOut   DateTime
   propertyId String
   
-  property   Property @relation(fields: [propertyId], references: [id])
+  property Property @relation(fields: [propertyId], references: [id])
 }
 
 model PersonalCode {
@@ -55,16 +60,16 @@ model PersonalCode {
   userId    String
   createdAt DateTime @default(now())
   
-  user      User     @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id])
 }
 
 model CleaningTask {
   id          String   @id @default(cuid())
   propertyId  String
   scheduledAt DateTime
-  duration    Int      // duur in minuten
-  status      String   @default("OPEN") // "OPEN", "ASSIGNED", "COMPLETED", "CANCELLED"
-  cleanerId   String?  // toegewezen schoonmaker
+  duration    Int
+  status      String   @default("OPEN")
+  cleanerId   String?
   notes       String?
   createdAt   DateTime @default(now())
   
@@ -77,11 +82,47 @@ model CleaningReserve {
   id        String   @id @default(cuid())
   taskId    String
   cleanerId String
-  status    String   @default("PENDING") // "PENDING", "ACCEPTED", "DECLINED"
+  status    String   @default("PENDING")
   createdAt DateTime @default(now())
   
   task    CleaningTask @relation(fields: [taskId], references: [id])
   cleaner User         @relation(fields: [cleanerId], references: [id])
   
-  @@unique([taskId, cleanerId]) // Een schoonmaker kan maar 1x reserveren per taak
+  @@unique([taskId, cleanerId])
+}
+
+model Integration {
+  id          String   @id @default(cuid())
+  propertyId  String
+  platform    String
+  apiKey      String?
+  webhookUrl  String?
+  icalUrl     String?
+  lastSync    DateTime?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  property Property @relation(fields: [propertyId], references: [id])
+  
+  @@unique([propertyId, platform])
+}
+
+model CalendarEvent {
+  id          String   @id @default(cuid())
+  externalId  String   @unique
+  propertyId  String
+  platform    String
+  guestName   String?
+  guestEmail  String?
+  checkIn     DateTime
+  checkOut    DateTime
+  status      String   @default("ACTIVE")
+  rawData     Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  property Property @relation(fields: [propertyId], references: [id])
+  
+  @@unique([propertyId, externalId])
 }

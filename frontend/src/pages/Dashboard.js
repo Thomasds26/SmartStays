@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import PropertyCalendar from '../components/PropertyCalendar';
 import './Dashboard.css';
 
 function Dashboard() {
@@ -32,7 +33,11 @@ function Dashboard() {
     
     const parsedUser = JSON.parse(userData);
     if (parsedUser.role !== 'VERHUURDER') {
-      navigate('/admin');
+      if (parsedUser.role === 'ADMIN') {
+        navigate('/admin');
+      } else {
+        navigate('/cleaner');
+      }
       return;
     }
     
@@ -214,10 +219,8 @@ function Dashboard() {
     localStorage.removeItem('user');
     
     if (isNative) {
-      // Native app: ga naar splash screen
       window.location.href = '/splash';
     } else {
-      // Webapp: ga naar homepagina
       window.location.href = '/';
     }
   };
@@ -276,97 +279,98 @@ function Dashboard() {
         </aside>
         
         <main className="dashboard-main">
-          <div className="main-header">
-            <h1>{selectedProperty ? selectedProperty.name : 'My Calendar'}</h1>
-            {selectedProperty && <span className="property-badge">Active property</span>}
-          </div>
-          
-          <div className="calendar-section">
-            <h2>Bookings</h2>
-            <div className="calendar-placeholder">
-              <p>Calendar</p>
-              <p className="placeholder-text">Booking synchronization coming soon</p>
-            </div>
-          </div>
-          
-          <div className="codes-section">
-            <h2>Access Codes</h2>
-            
-            <div className="code-card">
-              <div className="code-header">
-                <span className="code-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 2C8.13 2 5 5.13 5 9V12C3.5 12.5 3 13 3 15V18C3 19.1 3.9 20 5 20H19C20.1 20 21 19.1 21 18V15C21 13 20.5 12.5 19 12V9C19 5.13 15.87 2 12 2Z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-                    <path d="M9 22L12 20L15 22" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                  </svg>
-                </span>
-                <span className="code-label">Current guest code</span>
-              </div>
-              <div className="code-value">{currentCode}</div>
-              <div className="code-expiry">Expires after check-out</div>
-            </div>
-            
-            <div className="personal-codes-header">
-              <h3>Personal codes</h3>
-              {personalCodes.length < 4 && (
-                <button onClick={() => setShowAddCodeModal(true)} className="add-code-btn">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                  </svg>
-                  Add code
-                </button>
-              )}
-            </div>
-            
-            <div className="codes-grid">
-              {personalCodes.map(code => (
-                <div key={code.id} className="code-card personal-code-card">
+          {selectedProperty ? (
+            <>
+              <PropertyCalendar 
+                propertyId={selectedProperty.id} 
+                propertyName={selectedProperty.name} 
+              />
+              
+              <div className="codes-section">
+                <h2>Access Codes</h2>
+                
+                <div className="code-card">
                   <div className="code-header">
                     <span className="code-icon">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M20 21V19C20 16.8 18.2 15 16 15H8C5.8 15 4 16.8 4 19V21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                        <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2C8.13 2 5 5.13 5 9V12C3.5 12.5 3 13 3 15V18C3 19.1 3.9 20 5 20H19C20.1 20 21 19.1 21 18V15C21 13 20.5 12.5 19 12V9C19 5.13 15.87 2 12 2Z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                        <path d="M9 22L12 20L15 22" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                       </svg>
                     </span>
-                    <span className="code-label">{code.name}</span>
-                    <div className="code-actions">
-                      <button onClick={() => openEditModal(code)} className="icon-btn" title="Wijzigen">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M17 3L21 7L7 21H3V17L17 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-                        </svg>
-                      </button>
-                      <button onClick={() => handleDeleteCode(code.id, code.name)} className="icon-btn delete-icon" title="Verwijderen">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                          <path d="M4 7H20M10 11V16M14 11V16M5 7L6 19C6 20.1 6.9 21 8 21H16C17.1 21 18 20.1 18 19L19 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                          <path d="M9 7V4C9 3.4 9.4 3 10 3H14C14.6 3 15 3.4 15 4V7" stroke="currentColor" strokeWidth="1.5"/>
-                        </svg>
-                      </button>
-                    </div>
+                    <span className="code-label">Current guest code</span>
                   </div>
-                  <div className="code-value">{code.code}</div>
+                  <div className="code-value">{currentCode}</div>
+                  <div className="code-expiry">Expires after check-out</div>
                 </div>
-              ))}
-            </div>
-            
-            <div className="code-card battery-card">
-              <div className="code-header">
-                <span className="code-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect x="3" y="6" width="18" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-                    <path d="M21 10V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                  </svg>
-                </span>
-                <span className="code-label">Battery status</span>
-              </div>
-              <div className="battery-level">
-                <div className="battery-bar">
-                  <div className={`battery-fill ${batteryLevel <= 20 ? 'low' : batteryLevel <= 50 ? 'medium' : 'high'}`} style={{ width: `${batteryLevel}%` }} />
+                
+                <div className="personal-codes-header">
+                  <h3>Personal codes</h3>
+                  {personalCodes.length < 4 && (
+                    <button onClick={() => setShowAddCodeModal(true)} className="add-code-btn">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                      </svg>
+                      Add code
+                    </button>
+                  )}
                 </div>
-                <span className="battery-percentage">{batteryLevel}%</span>
+                
+                <div className="codes-grid">
+                  {personalCodes.map(code => (
+                    <div key={code.id} className="code-card personal-code-card">
+                      <div className="code-header">
+                        <span className="code-icon">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M20 21V19C20 16.8 18.2 15 16 15H8C5.8 15 4 16.8 4 19V21" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                            <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                          </svg>
+                        </span>
+                        <span className="code-label">{code.name}</span>
+                        <div className="code-actions">
+                          <button onClick={() => openEditModal(code)} className="icon-btn" title="Wijzigen">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M17 3L21 7L7 21H3V17L17 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                            </svg>
+                          </button>
+                          <button onClick={() => handleDeleteCode(code.id, code.name)} className="icon-btn delete-icon" title="Verwijderen">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M4 7H20M10 11V16M14 11V16M5 7L6 19C6 20.1 6.9 21 8 21H16C17.1 21 18 20.1 18 19L19 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                              <path d="M9 7V4C9 3.4 9.4 3 10 3H14C14.6 3 15 3.4 15 4V7" stroke="currentColor" strokeWidth="1.5"/>
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                      <div className="code-value">{code.code}</div>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="code-card battery-card">
+                  <div className="code-header">
+                    <span className="code-icon">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="3" y="6" width="18" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                        <path d="M21 10V14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                      </svg>
+                    </span>
+                    <span className="code-label">Battery status</span>
+                  </div>
+                  <div className="battery-level">
+                    <div className="battery-bar">
+                      <div className={`battery-fill ${batteryLevel <= 20 ? 'low' : batteryLevel <= 50 ? 'medium' : 'high'}`} style={{ width: `${batteryLevel}%` }} />
+                    </div>
+                    <span className="battery-percentage">{batteryLevel}%</span>
+                  </div>
+                  {batteryLevel <= 20 && <div className="battery-warning">Battery low - replace soon</div>}
+                </div>
               </div>
-              {batteryLevel <= 20 && <div className="battery-warning">Battery low - replace soon</div>}
+            </>
+          ) : (
+            <div className="no-property-selected">
+              <h2>Geen woning geselecteerd</h2>
+              <p>Selecteer een woning uit het menu om de kalender te bekijken.</p>
             </div>
-          </div>
+          )}
         </main>
       </div>
 
@@ -387,31 +391,26 @@ function Dashboard() {
               </div>
               <div className="form-group">
                 <label>Naam</label>
-                <input
-                  type="text"
-                  value={newCodeName}
-                  onChange={(e) => setNewCodeName(e.target.value)}
-                  placeholder="Bijv. Mijn code, Vrouw, Kind"
-                />
+                <input type="text" value={newCodeName} onChange={(e) => setNewCodeName(e.target.value)} placeholder="Bijv. Mijn code, Vrouw, Kind" />
               </div>
               <div className="form-group">
                 <label>Nieuwe code (6 cijfers)</label>
-                <input
-                  type="text"
-                  value={newCodeValue}
-                  onChange={(e) => setNewCodeValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  placeholder="123456"
+                <input 
+                  type="text" 
+                  value={newCodeValue} 
+                  onChange={(e) => setNewCodeValue(e.target.value.replace(/\D/g, '').slice(0, 6))} 
+                  placeholder="123456" 
                   maxLength="6"
                   className="code-input"
                 />
               </div>
               <div className="form-group">
                 <label>Herhaal code</label>
-                <input
-                  type="text"
-                  value={confirmCodeValue}
-                  onChange={(e) => setConfirmCodeValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  placeholder="123456"
+                <input 
+                  type="text" 
+                  value={confirmCodeValue} 
+                  onChange={(e) => setConfirmCodeValue(e.target.value.replace(/\D/g, '').slice(0, 6))} 
+                  placeholder="123456" 
                   maxLength="6"
                   className="code-input"
                 />
@@ -443,31 +442,26 @@ function Dashboard() {
               </div>
               <div className="form-group">
                 <label>Naam (optioneel)</label>
-                <input
-                  type="text"
-                  value={newCodeName}
-                  onChange={(e) => setNewCodeName(e.target.value)}
-                  placeholder="Bijv. Vrouw, Kind, Schoonmoeder"
-                />
+                <input type="text" value={newCodeName} onChange={(e) => setNewCodeName(e.target.value)} placeholder="Bijv. Vrouw, Kind, Schoonmoeder" />
               </div>
               <div className="form-group">
                 <label>Code (6 cijfers)</label>
-                <input
-                  type="text"
-                  value={newCodeValue}
-                  onChange={(e) => setNewCodeValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  placeholder="123456"
+                <input 
+                  type="text" 
+                  value={newCodeValue} 
+                  onChange={(e) => setNewCodeValue(e.target.value.replace(/\D/g, '').slice(0, 6))} 
+                  placeholder="123456" 
                   maxLength="6"
                   className="code-input"
                 />
               </div>
               <div className="form-group">
                 <label>Herhaal code</label>
-                <input
-                  type="text"
-                  value={confirmCodeValue}
-                  onChange={(e) => setConfirmCodeValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  placeholder="123456"
+                <input 
+                  type="text" 
+                  value={confirmCodeValue} 
+                  onChange={(e) => setConfirmCodeValue(e.target.value.replace(/\D/g, '').slice(0, 6))} 
+                  placeholder="123456" 
                   maxLength="6"
                   className="code-input"
                 />

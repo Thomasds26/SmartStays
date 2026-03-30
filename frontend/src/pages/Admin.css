@@ -636,6 +636,7 @@ th {
   font-size: 64px;
   margin-bottom: 16px;
   opacity: 0.5;
+  color: var(--primary);
 }
 
 .calendar-placeholder h3 {
@@ -721,6 +722,14 @@ th {
   margin: 0;
 }
 
+.help-text {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #999;
+  line-height: 1.4;
+}
+
 @media (max-width: 768px) {
   .calendar-task-card {
     flex-direction: column;
@@ -735,4 +744,29 @@ th {
     text-align: left;
     min-width: auto;
   }
+}
+
+/* Voeg toe aan bestaande Admin.css */
+
+/* Help text styling */
+.help-text {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #999;
+  line-height: 1.4;
+}
+
+/* Property modal */
+.property-modal {
+  max-width: 550px;
+}
+
+/* Edit buttons */
+.action-btn.edit-btn {
+  color: var(--primary);
+}
+
+.action-btn.edit-btn:hover {
+  text-decoration: underline;
 }
