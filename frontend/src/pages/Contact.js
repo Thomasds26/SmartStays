@@ -8,6 +8,8 @@ function Contact() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [propertyType, setPropertyType] = useState('');
   const [message, setMessage] = useState('');
   const [packageType, setPackageType] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -16,17 +18,30 @@ function Contact() {
   useEffect(() => {
     document.title = 'SmartStays - Contact';
     
-    // Check of er een pakket is meegegeven via URL
+    // Check of er parameters zijn meegegeven via URL
     const params = new URLSearchParams(location.search);
     const pkg = params.get('package');
+    const products = params.get('products');
+    const msg = params.get('message');
+    
     if (pkg) {
       setPackageType(pkg);
       setMessage(`Ik ben geïnteresseerd in het ${pkg} pakket.`);
+    }
+    
+    if (products) {
+      setPackageType(products);
+      setMessage(msg || `Ik ben geïnteresseerd in: ${products}. Ik wil graag een vrijblijvend adviesgesprek.`);
     }
   }, [location]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    if (!name || !email || !propertyType) {
+      setError('Vul alle verplichte velden in');
+      return;
+    }
     
     if (message.length > 500) {
       setError('Bericht mag maximaal 500 tekens bevatten');
@@ -34,7 +49,18 @@ function Contact() {
     }
     
     setError('');
-    console.log('Offerte aanvraag:', { name, email, phone, packageType, message });
+    
+    // Hier komt later de echte API call
+    console.log('Offerte aanvraag:', { 
+      name, 
+      email, 
+      phone, 
+      address, 
+      propertyType, 
+      packageType, 
+      message 
+    });
+    
     setSubmitted(true);
     setTimeout(() => setSubmitted(false), 5000);
   };
@@ -48,9 +74,17 @@ function Contact() {
             <p>Offerte aangevraagd</p>
           </div>
           <div className="success-message">
-            <p>Bedankt voor je aanvraag!</p>
+            <p>Bedankt voor je aanvraag, {name || '!'}</p>
             <p>We nemen zo snel mogelijk contact met je op om een afspraak te maken.</p>
+            <p className="small-note">Je ontvangt ook een bevestiging per e-mail.</p>
           </div>
+          <button 
+            onClick={() => setSubmitted(false)} 
+            className="back-btn"
+            style={{ marginTop: '20px', backgroundColor: '#1e88e5', color: 'white' }}
+          >
+            Nieuwe aanvraag
+          </button>
         </div>
       </div>
     );
@@ -71,6 +105,12 @@ function Contact() {
           </div>
         </div>
         
+        {packageType && (
+          <div className="selected-package">
+            <strong>Geselecteerd:</strong> {packageType}
+          </div>
+        )}
+        
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label>Naam *</label>
@@ -79,6 +119,7 @@ function Contact() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
+              placeholder="Jan Jansens"
             />
           </div>
           
@@ -89,6 +130,7 @@ function Contact() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              placeholder="jan@email.com"
             />
           </div>
           
@@ -98,6 +140,7 @@ function Contact() {
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
+              placeholder="04xx xx xx xx"
             />
           </div>
           
@@ -105,13 +148,19 @@ function Contact() {
             <label>Adres (optioneel)</label>
             <input
               type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
               placeholder="Straat, nummer, stad"
             />
           </div>
           
           <div className="form-group">
             <label>Type woning *</label>
-            <select required>
+            <select 
+              value={propertyType}
+              onChange={(e) => setPropertyType(e.target.value)}
+              required
+            >
               <option value="">Selecteer type</option>
               <option value="studio">Studio / klein appartement (tot 50 m²)</option>
               <option value="appartement1">Appartement (1 slaapkamer, tot 80 m²)</option>
@@ -137,11 +186,12 @@ function Contact() {
           
           {error && <div className="error-message">{error}</div>}
           
-          <button type="submit">Offerte aanvragen</button>
+          <button type="submit" className="submit-btn">Offerte aanvragen</button>
         </form>
         
         <div className="contact-footer">
           <p>Of bel ons: <strong>+32 123 45 67 89</strong></p>
+          <p className="availability">Maandag - Vrijdag: 09:00 - 17:00</p>
         </div>
       </div>
     </div>
