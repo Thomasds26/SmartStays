@@ -11,9 +11,15 @@ function Splash() {
     
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
-    const platform = localStorage.getItem('platform');
+    const isNative = localStorage.getItem('isNativeApp') === 'true';
     
-    setTimeout(() => {
+    // Alleen als het echt een native app is, anders naar home
+    if (!isNative) {
+      navigate('/');
+      return;
+    }
+    
+    const timer = setTimeout(() => {
       if (token && userData) {
         try {
           const user = JSON.parse(userData);
@@ -30,13 +36,11 @@ function Splash() {
           navigate('/login');
         }
       } else {
-        if (platform === 'mobile') {
-          navigate('/login');
-        } else {
-          navigate('/');
-        }
+        navigate('/login');
       }
     }, 1500);
+    
+    return () => clearTimeout(timer);
   }, [navigate]);
 
   return (

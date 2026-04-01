@@ -24,7 +24,17 @@ function App() {
   };
 
   useEffect(() => {
-    localStorage.setItem('isNativeApp', isNativeMobileApp() ? 'true' : 'false');
+    // Alleen als er nog geen platform is opgeslagen, of als we expliciet willen resetten
+    const existingPlatform = localStorage.getItem('isNativeApp');
+    const urlNative = new URLSearchParams(window.location.search).get('native');
+    
+    if (urlNative === 'true') {
+      localStorage.setItem('isNativeApp', 'true');
+    } else if (urlNative === 'false') {
+      localStorage.setItem('isNativeApp', 'false');
+    } else if (!existingPlatform) {
+      localStorage.setItem('isNativeApp', isNativeMobileApp() ? 'true' : 'false');
+    }
   }, []);
 
   const isAuthenticated = () => {
@@ -48,9 +58,26 @@ function App() {
   return (
     <Router>
       <Routes>
-        {!isNative && <Route path="/" element={<Home />} />}
-        {isNative && <Route path="/" element={<Splash />} />}
-        <Route path="/splash" element={<Splash />} />
+        {/* Webapp routes */}
+        {!isNative && (
+          <>
+            <Route path="/" element={<Home />} />
+            {/* Splash bestaat niet in webapp, redirect naar home */}
+            <Route path="/splash" element={<Navigate to="/" />} />
+          </>
+        )}
+        
+        {/* Native app routes */}
+        {isNative && (
+          <>
+            <Route path="/" element={<Splash />} />
+            <Route path="/splash" element={<Splash />} />
+            {/* Home bestaat niet in native app, redirect naar splash */}
+            <Route path="/home" element={<Navigate to="/" />} />
+          </>
+        )}
+        
+        {/* Gedeelde routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/pricing" element={<Pricing />} />
@@ -60,7 +87,7 @@ function App() {
           element={
             isAuthenticated() && getUserRole() === 'VERHUURDER' ? 
             <Dashboard /> : 
-            <Navigate to={isNative ? "/splash" : "/login"} />
+            <Navigate to={isNative ? "/" : "/login"} />
           } 
         />
         <Route 
@@ -68,7 +95,7 @@ function App() {
           element={
             isAuthenticated() && getUserRole() === 'SCHOONMAKER' ? 
             <CleanerDashboard /> : 
-            <Navigate to={isNative ? "/splash" : "/login"} />
+            <Navigate to={isNative ? "/" : "/login"} />
           } 
         />
         <Route 
@@ -76,7 +103,7 @@ function App() {
           element={
             isAuthenticated() && getUserRole() === 'ADMIN' ? 
             <Admin /> : 
-            <Navigate to={isNative ? "/splash" : "/login"} />
+            <Navigate to={isNative ? "/" : "/login"} />
           } 
         />
       </Routes>
