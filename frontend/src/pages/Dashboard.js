@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import PropertyCalendar from '../components/PropertyCalendar';
 import SmartStaysLogo from '../components/SmartStaysLogo';
+import API_URL from '../config';
 import './Dashboard.css';
 
 function Dashboard() {
@@ -51,7 +52,7 @@ function Dashboard() {
   const fetchProperties = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:3000/api/properties', {
+      const response = await axios.get(`${API_URL}/api/properties`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setProperties(response.data);
@@ -72,7 +73,7 @@ function Dashboard() {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:3000/api/personal-codes', {
+      const response = await axios.get(`${API_URL}/api/personal-codes`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setPersonalCodes(response.data);
@@ -88,7 +89,7 @@ function Dashboard() {
     if (newName && newName !== currentName) {
       try {
         const token = localStorage.getItem('token');
-        await axios.put(`http://localhost:3000/api/properties/${propertyId}`, 
+        await axios.put(`${API_URL}/api/properties/${propertyId}`, 
           { name: newName, address: '' },
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -126,7 +127,7 @@ function Dashboard() {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.post('http://localhost:3000/api/personal-codes', {
+      const response = await axios.post(`${API_URL}/api/personal-codes`, {
         name: newCodeName || `Code ${personalCodes.length + 1}`,
         code: newCodeValue
       }, {
@@ -161,7 +162,7 @@ function Dashboard() {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.put(`http://localhost:3000/api/personal-codes/${editingCodeId}`, {
+      const response = await axios.put(`${API_URL}/api/personal-codes/${editingCodeId}`, {
         name: editingCodeName || newCodeName,
         code: newCodeValue
       }, {
@@ -191,7 +192,7 @@ function Dashboard() {
       try {
         setLoading(true);
         const token = localStorage.getItem('token');
-        await axios.delete(`http://localhost:3000/api/personal-codes/${codeId}`, {
+        await axios.delete(`${API_URL}/api/personal-codes/${codeId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         

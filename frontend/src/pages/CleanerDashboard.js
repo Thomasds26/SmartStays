@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import SmartStaysLogo from '../components/SmartStaysLogo';
+import API_URL from '../config';
 import './CleanerDashboard.css';
 
 function CleanerDashboard() {
@@ -49,13 +50,13 @@ function CleanerDashboard() {
     try {
       const token = localStorage.getItem('token');
       const [openRes, myTasksRes, myReservesRes] = await Promise.all([
-        axios.get('http://localhost:3000/api/cleaning-tasks?status=OPEN', {
+        axios.get(`${API_URL}/api/cleaning-tasks?status=OPEN`, {
           headers: { Authorization: `Bearer ${token}` }
         }),
-        axios.get('http://localhost:3000/api/my-tasks', {
+        axios.get(`${API_URL}/api/my-tasks`, {
           headers: { Authorization: `Bearer ${token}` }
         }),
-        axios.get('http://localhost:3000/api/my-reserves', {
+        axios.get(`${API_URL}/api/my-reserves`, {
           headers: { Authorization: `Bearer ${token}` }
         })
       ]);
@@ -78,7 +79,7 @@ function CleanerDashboard() {
     if (window.confirm('Weet je zeker dat je deze taak wilt uitvoeren?')) {
       try {
         const token = localStorage.getItem('token');
-        await axios.post(`http://localhost:3000/api/cleaning-tasks/${taskId}/assign`, {}, {
+        await axios.post(`${API_URL}/api/cleaning-tasks/${taskId}/assign`, {}, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setMessage('Taak succesvol toegewezen!');
@@ -93,7 +94,7 @@ function CleanerDashboard() {
   const handleReserveTask = async (taskId) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.post(`http://localhost:3000/api/cleaning-tasks/${taskId}/reserve`, {}, {
+      await axios.post(`${API_URL}/api/cleaning-tasks/${taskId}/reserve`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setMessage('Je staat nu op de reservelijst!');
@@ -108,7 +109,7 @@ function CleanerDashboard() {
     if (window.confirm('Weet je zeker dat je je reserve wilt annuleren?')) {
       try {
         const token = localStorage.getItem('token');
-        await axios.delete(`http://localhost:3000/api/my-reserves/${reserveId}`, {
+        await axios.delete(`${API_URL}/api/my-reserves/${reserveId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setMessage('Reserve geannuleerd');
@@ -142,7 +143,7 @@ function CleanerDashboard() {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await axios.put('http://localhost:3000/api/cleaner/personal-code', 
+      const response = await axios.put(`${API_URL}/api/cleaner/personal-code`, 
         { personalCode: newPersonalCode },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -204,7 +205,6 @@ function CleanerDashboard() {
       
       <div className="cleaner-content">
         <div className="cleaner-header">
-          <h1>Schoonmaker Dashboard</h1>
           <div className="tab-buttons">
             <button className={`tab-btn ${activeTab === 'available' ? 'active' : ''}`} onClick={() => setActiveTab('available')}>
               Beschikbare taken ({openTasks.length})

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import './Login.css';
 import SmartStaysLogo from '../components/SmartStaysLogo';
+import API_URL from '../config';
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -36,7 +37,7 @@ function Login() {
     setLoading(true);
 
     try {
-      const response = await axios.post('http://localhost:3000/api/login', {
+      const response = await axios.post(`${API_URL}/api/login`, {
         email,
         password
       });

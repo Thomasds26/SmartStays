@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import SmartStaysLogo from '../components/SmartStaysLogo';
+import API_URL from '../config';
 import './Activate.css';
 
 function Activate() {
@@ -22,7 +23,7 @@ function Activate() {
     
     const fetchUserRole = async () => {
       try {
-        const response = await axios.post('http://localhost:3000/api/check-activation', { token });
+        const response = await axios.post(`${API_URL}/api/check-activation`, { token });
         setRole(response.data.role);
       } catch (error) {
         setMessage('Ongeldige activatie link');
@@ -84,7 +85,7 @@ function Activate() {
     
     setLoading(true);
     try {
-      const response = await axios.post('http://localhost:3000/api/activate', {
+      const response = await axios.post(`${API_URL}/api/activate`, {
         token,
         name,
         password,

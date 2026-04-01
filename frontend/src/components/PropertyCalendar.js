@@ -1,18 +1,59 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import timeGridPlugin from '@fullcalendar/timegrid';
-import interactionPlugin from '@fullcalendar/interaction';
-import nlLocale from '@fullcalendar/core/locales/nl';
+import { Calendar, momentLocalizer } from 'react-big-calendar';
+import moment from 'moment';
+import 'react-big-calendar/lib/css/react-big-calendar.css';
+import API_URL from '../config';
 import './PropertyCalendar.css';
+
+// Zet week op maandag als eerste dag en Nederlands, 24-uurs notatie
+moment.locale('nl', {
+  week: {
+    dow: 1,
+  },
+  months: 'januari_februari_maart_april_mei_juni_juli_augustus_september_oktober_november_december'.split('_'),
+  monthsShort: 'jan_feb_maa_apr_mei_jun_jul_aug_sep_okt_nov_dec'.split('_'),
+  weekdays: 'zondag_maandag_dinsdag_woensdag_donderdag_vrijdag_zaterdag'.split('_'),
+  weekdaysShort: 'zo_ma_di_wo_do_vr_za'.split('_'),
+  weekdaysMin: 'zo_ma_di_wo_do_vr_za'.split('_')
+});
+
+// 24-uurs notatie
+moment.updateLocale('nl', {
+  longDateFormat: {
+    LT: 'HH:mm',
+    LTS: 'HH:mm:ss',
+    L: 'DD/MM/YYYY',
+    LL: 'D MMMM YYYY',
+    LLL: 'D MMMM YYYY HH:mm',
+    LLLL: 'dddd D MMMM YYYY HH:mm'
+  }
+});
+
+const localizer = momentLocalizer(moment);
+
+// Nederlandse vertaling voor kalender
+const messages = {
+  today: 'Vandaag',
+  previous: 'Vorige',
+  next: 'Volgende',
+  month: 'Maand',
+  week: 'Week',
+  day: 'Dag',
+  agenda: 'Agenda',
+  date: 'Datum',
+  time: 'Tijd',
+  event: 'Afspraak',
+  noEventsInRange: 'Geen afspraken in deze periode',
+  showMore: total => `+${total} meer`
+};
 
 function PropertyCalendar({ propertyId, propertyName }) {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const wsRef = useRef(null);
+  const [currentView, setCurrentView] = useState('month');
+  const [currentDate, setCurrentDate] = useState(new Date());
 
-  // Fetch kalender data
   const fetchCalendarData = useCallback(async () => {
     if (!propertyId) return;
     
@@ -20,10 +61,10 @@ function PropertyCalendar({ propertyId, propertyName }) {
       const token = localStorage.getItem('token');
       
       const [calendarRes, cleaningRes] = await Promise.all([
-        axios.get(`http://localhost:3000/api/calendar/${propertyId}`, {
+        axios.get(`${API_URL}/api/calendar/${propertyId}`, {
           headers: { Authorization: `Bearer ${token}` }
         }),
-        axios.get(`http://localhost:3000/api/cleaning-tasks`, {
+        axios.get(`${API_URL}/api/cleaning-tasks`, {
           headers: { Authorization: `Bearer ${token}` }
         })
       ]);
@@ -31,16 +72,10 @@ function PropertyCalendar({ propertyId, propertyName }) {
       const bookingEvents = calendarRes.data.map(booking => ({
         id: booking.id,
         title: `${booking.guestName || 'Gast'} - ${booking.platform}`,
-        start: booking.checkIn,
-        end: booking.checkOut,
-        backgroundColor: '#1e88e5',
-        borderColor: '#1e88e5',
-        textColor: 'white',
-        extendedProps: {
-          type: 'booking',
-          guestName: booking.guestName,
-          platform: booking.platform
-        }
+        start: new Date(booking.checkIn),
+        end: new Date(booking.checkOut),
+        type: 'booking',
+        backgroundColor: '#1e88e5'
       }));
       
       const cleaningEvents = cleaningRes.data
@@ -48,17 +83,10 @@ function PropertyCalendar({ propertyId, propertyName }) {
         .map(task => ({
           id: `clean-${task.id}`,
           title: `Schoonmaak - ${task.duration} min`,
-          start: task.scheduledAt,
+          start: new Date(task.scheduledAt),
           end: new Date(new Date(task.scheduledAt).getTime() + task.duration * 60000),
-          backgroundColor: '#4caf50',
-          borderColor: '#4caf50',
-          textColor: 'white',
-          extendedProps: {
-            type: 'cleaning',
-            status: task.status,
-            cleanerName: task.cleaner_name,
-            duration: task.duration
-          }
+          type: 'cleaning',
+          backgroundColor: '#4caf50'
         }));
       
       setEvents([...bookingEvents, ...cleaningEvents]);
@@ -69,60 +97,37 @@ function PropertyCalendar({ propertyId, propertyName }) {
     }
   }, [propertyId]);
 
-  // WebSocket verbinding voor real-time updates
-  useEffect(() => {
-    if (!propertyId) return;
-    
-    const connectWebSocket = () => {
-      wsRef.current = new WebSocket('ws://localhost:3002');
-      
-      wsRef.current.onopen = () => {
-        console.log('WebSocket verbonden');
-      };
-      
-      wsRef.current.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        console.log('WebSocket bericht:', data);
-        
-        if (data.type === 'CALENDAR_SYNC' && data.data.propertyId === propertyId) {
-          console.log('Real-time update ontvangen, kalender wordt ververst');
-          fetchCalendarData();
-        }
-      };
-      
-      wsRef.current.onclose = () => {
-        console.log('WebSocket verbinding verbroken, probeer opnieuw over 5 seconden');
-        setTimeout(connectWebSocket, 5000);
-      };
-      
-      wsRef.current.onerror = (error) => {
-        console.error('WebSocket error:', error);
-      };
-    };
-    
-    connectWebSocket();
-    
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-    };
-  }, [propertyId, fetchCalendarData]);
-
-  // Eerste lading
   useEffect(() => {
     fetchCalendarData();
   }, [fetchCalendarData]);
 
-  const handleEventClick = (info) => {
-    const event = info.event;
-    const props = event.extendedProps;
-    
-    if (props.type === 'booking') {
-      alert(`Boeking: ${props.guestName}\nPlatform: ${props.platform}\nDatum: ${event.start.toLocaleDateString('nl-NL')} - ${event.end.toLocaleDateString('nl-NL')}`);
-    } else if (props.type === 'cleaning') {
-      alert(`Schoonmaak taak\nStatus: ${props.status === 'OPEN' ? 'Open' : 'Toegewezen'}\nDuur: ${props.duration} minuten\n${props.cleanerName ? `Schoonmaker: ${props.cleanerName}` : ''}`);
+  const eventStyleGetter = (event) => {
+    return {
+      style: {
+        backgroundColor: event.backgroundColor,
+        borderRadius: '4px',
+        border: 'none',
+        color: 'white',
+        fontSize: '11px',
+        padding: '2px 6px'
+      }
+    };
+  };
+
+  const handleSelectEvent = (event) => {
+    if (event.type === 'booking') {
+      alert(`Boeking: ${event.title}\nVan: ${moment(event.start).format('DD-MM-YYYY HH:mm')}\nTot: ${moment(event.end).format('DD-MM-YYYY HH:mm')}`);
+    } else {
+      alert(`Schoonmaak taak: ${event.title}\nDatum: ${moment(event.start).format('DD-MM-YYYY HH:mm')}`);
     }
+  };
+
+  const handleNavigate = (date) => {
+    setCurrentDate(date);
+  };
+
+  const handleViewChange = (view) => {
+    setCurrentView(view);
   };
 
   if (loading) {
@@ -134,20 +139,23 @@ function PropertyCalendar({ propertyId, propertyName }) {
       <div className="calendar-header">
         <h3>Kalender - {propertyName}</h3>
       </div>
-      <FullCalendar
-        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-        headerToolbar={{
-          left: 'prev,next today',
-          center: 'title',
-          right: 'dayGridMonth,timeGridWeek,timeGridDay'
-        }}
-        locale={nlLocale}
-        initialView="dayGridMonth"
+      <Calendar
+        localizer={localizer}
         events={events}
-        eventClick={handleEventClick}
-        height="auto"
-        weekends={true}
-        nowIndicator={true}
+        startAccessor="start"
+        endAccessor="end"
+        style={{ height: 550 }}
+        messages={messages}
+        eventPropGetter={eventStyleGetter}
+        onSelectEvent={handleSelectEvent}
+        views={['month', 'week', 'day']}
+        defaultView="month"
+        view={currentView}
+        date={currentDate}
+        onNavigate={handleNavigate}
+        onView={handleViewChange}
+        popup
+        tooltipAccessor={(event) => event.title}
       />
       <div className="calendar-legend">
         <div className="legend-item">

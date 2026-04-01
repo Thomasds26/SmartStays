@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import SmartStaysLogo from '../components/SmartStaysLogo';
+import API_URL from '../config';
 import './Admin.css';
 
 function Admin() {
@@ -125,7 +126,7 @@ function Admin() {
   const fetchUsers = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:3000/api/users', {
+      const response = await axios.get(`${API_URL}/api/users`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setUsers(response.data);
@@ -142,7 +143,7 @@ function Admin() {
   const fetchProperties = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:3000/api/admin/properties', {
+      const response = await axios.get(`${API_URL}/api/admin/properties`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setProperties(response.data);
@@ -154,7 +155,7 @@ function Admin() {
   const fetchUsersList = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:3000/api/users', {
+      const response = await axios.get(`${API_URL}/api/users`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const verhuurders = response.data.filter(u => u.role === 'VERHUURDER');
@@ -168,7 +169,7 @@ function Admin() {
   const fetchCleaningTasks = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:3000/api/cleaning-tasks', {
+      const response = await axios.get(`${API_URL}/api/cleaning-tasks`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setCleaningTasks(response.data);
@@ -185,7 +186,7 @@ function Admin() {
     }
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('http://localhost:3000/api/users', newUser, {
+      const response = await axios.post(`${API_URL}/api/users`, newUser, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setMessage({ text: response.data.message, type: 'success' });
@@ -205,7 +206,7 @@ function Admin() {
     
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.put(`http://localhost:3000/api/users/${editingUser.id}`, {
+      const response = await axios.put(`${API_URL}/api/users/${editingUser.id}`, {
         name: editingUser.name,
         email: editingUser.email,
         role: editingUser.role
@@ -231,7 +232,7 @@ function Admin() {
     }
     try {
       const token = localStorage.getItem('token');
-      await axios.post('http://localhost:3000/api/admin/properties', newProperty, {
+      await axios.post(`${API_URL}/api/admin/properties`, newProperty, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setMessage({ text: 'Woning succesvol toegevoegd', type: 'success' });
@@ -258,7 +259,7 @@ function Admin() {
     
     try {
       const token = localStorage.getItem('token');
-      await axios.put(`http://localhost:3000/api/admin/properties/${editingProperty.id}`, {
+      await axios.put(`${API_URL}/api/admin/properties/${editingProperty.id}`, {
         name: editingProperty.name,
         address: editingProperty.address,
         ownerId: editingProperty.ownerId,
@@ -281,7 +282,7 @@ function Admin() {
   const handleDeleteUser = async (userId, userName) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:3000/api/users/${userId}`, {
+      await axios.delete(`${API_URL}/api/users/${userId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setMessage({ text: `${userName} is verwijderd`, type: 'success' });
@@ -296,32 +297,31 @@ function Admin() {
     }
   };
 
-const handleDeleteProperty = async (propertyId, propertyName) => {
-  // Toon bevestiging voordat je verwijdert
-  const confirmed = window.confirm(
-    `Weet je zeker dat je de woning "${propertyName}" wilt verwijderen?\n\n` +
-    `Dit verwijdert ook:\n` +
-    `- Alle boekingen voor deze woning\n` +
-    `- Alle schoonmaak taken\n` +
-    `- iCal integraties\n\n` +
-    `Deze actie kan niet ongedaan worden gemaakt.`
-  );
-  
-  if (!confirmed) return;
-  
-  try {
-    const token = localStorage.getItem('token');
-    await axios.delete(`http://localhost:3000/api/admin/properties/${propertyId}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    setMessage({ text: `"${propertyName}" is verwijderd`, type: 'success' });
-    fetchProperties();
-    fetchCleaningTasks();
-    setTimeout(() => setMessage({ text: '', type: '' }), 3000);
-  } catch (error) {
-    setMessage({ text: 'Fout bij verwijderen', type: 'error' });
-  }
-};
+  const handleDeleteProperty = async (propertyId, propertyName) => {
+    const confirmed = window.confirm(
+      `Weet je zeker dat je de woning "${propertyName}" wilt verwijderen?\n\n` +
+      `Dit verwijdert ook:\n` +
+      `- Alle boekingen voor deze woning\n` +
+      `- Alle schoonmaak taken\n` +
+      `- iCal integraties\n\n` +
+      `Deze actie kan niet ongedaan worden gemaakt.`
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`${API_URL}/api/admin/properties/${propertyId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setMessage({ text: `"${propertyName}" is verwijderd`, type: 'success' });
+      fetchProperties();
+      fetchCleaningTasks();
+      setTimeout(() => setMessage({ text: '', type: '' }), 3000);
+    } catch (error) {
+      setMessage({ text: 'Fout bij verwijderen', type: 'error' });
+    }
+  };
 
   const handleLogout = () => {
     const isNative = localStorage.getItem('isNativeApp') === 'true';
@@ -392,9 +392,9 @@ const handleDeleteProperty = async (propertyId, propertyName) => {
   return (
     <div className="admin-container">
       <nav className="admin-nav">
-      <div className="nav-brand">
-        <SmartStaysLogo className="nav-logo" />
-      </div>
+        <div className="nav-brand">
+          <SmartStaysLogo className="nav-logo" />
+        </div>
         <div className="nav-user">
           <span>Welkom, {user.name}</span>
           <button onClick={handleLogout} className="logout-btn">Uitloggen</button>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import SmartStaysLogo from '../components/SmartStaysLogo';
+import API_URL from '../config';
 import './Contact.css';
 
 function Contact() {
@@ -35,7 +36,7 @@ function Contact() {
     }
   }, [location]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!name || !email || !propertyType) {
@@ -51,18 +52,28 @@ function Contact() {
     setError('');
     
     // Hier komt later de echte API call
-    console.log('Offerte aanvraag:', { 
-      name, 
-      email, 
-      phone, 
-      address, 
-      propertyType, 
-      packageType, 
-      message 
-    });
-    
-    setSubmitted(true);
-    setTimeout(() => setSubmitted(false), 5000);
+    try {
+      // Voor nu alleen console.log, later wordt dit een POST naar de backend
+      console.log('Offerte aanvraag:', { 
+        name, 
+        email, 
+        phone, 
+        address, 
+        propertyType, 
+        packageType, 
+        message 
+      });
+      
+      // Later:
+      // const response = await axios.post(`${API_URL}/api/contact`, {
+      //   name, email, phone, address, propertyType, packageType, message
+      // });
+      
+      setSubmitted(true);
+      setTimeout(() => setSubmitted(false), 5000);
+    } catch (err) {
+      setError('Er is iets misgegaan. Probeer later opnieuw.');
+    }
   };
 
   if (submitted) {
