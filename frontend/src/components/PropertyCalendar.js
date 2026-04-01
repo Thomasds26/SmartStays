@@ -130,6 +130,42 @@ function PropertyCalendar({ propertyId, propertyName }) {
     setCurrentView(view);
   };
 
+  // Formatteer de datum voor weergave (bijv. "april 2026")
+  const formatMonthYear = (date) => {
+    return moment(date).format('MMMM YYYY');
+  };
+
+  // Custom toolbar met maand/jaar label
+  const CustomToolbar = (toolbar) => {
+    const goToBack = () => toolbar.onNavigate('PREV');
+    const goToNext = () => toolbar.onNavigate('NEXT');
+    const goToToday = () => toolbar.onNavigate('TODAY');
+
+    return (
+      <div className="rbc-toolbar">
+        <div className="rbc-btn-group">
+          <button onClick={goToBack} className="rbc-button">Vorige</button>
+          <button onClick={goToToday} className="rbc-button">Vandaag</button>
+          <button onClick={goToNext} className="rbc-button">Volgende</button>
+        </div>
+        <div className="rbc-toolbar-label">
+          {formatMonthYear(toolbar.date)}
+        </div>
+        <div className="rbc-btn-group">
+          <button onClick={() => toolbar.onView('day')} className={toolbar.view === 'day' ? 'rbc-active' : ''}>
+            Dag
+          </button>
+          <button onClick={() => toolbar.onView('week')} className={toolbar.view === 'week' ? 'rbc-active' : ''}>
+            Week
+          </button>
+          <button onClick={() => toolbar.onView('month')} className={toolbar.view === 'month' ? 'rbc-active' : ''}>
+            Maand
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return <div className="calendar-loading">Kalender laden...</div>;
   }
@@ -148,12 +184,15 @@ function PropertyCalendar({ propertyId, propertyName }) {
         messages={messages}
         eventPropGetter={eventStyleGetter}
         onSelectEvent={handleSelectEvent}
-        views={['month', 'week', 'day']}
+        views={['day', 'week', 'month']}
         defaultView="month"
         view={currentView}
         date={currentDate}
         onNavigate={handleNavigate}
         onView={handleViewChange}
+        components={{
+          toolbar: CustomToolbar
+        }}
         popup
         tooltipAccessor={(event) => event.title}
       />
