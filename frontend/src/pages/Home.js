@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import Navbar from '../components/Navbar';
 import './Home.css';
 import SmartStaysLogo from '../components/SmartStaysLogo';
 
@@ -31,6 +32,8 @@ function Home() {
 
   return (
     <div className="home-container">
+      <Navbar />
+      
       {/* Hero sectie met cloud afbeelding */}
       <section className="hero">
         <div className="hero-content">
@@ -56,8 +59,8 @@ function Home() {
       <section className="promo-banner">
         <div className="promo-content">
           <div className="promo-text">
-            <h3>€50 korting op je smart lock + gratis installatie!</h3>
-            <p>Bij afname van SmartStays ontvang je een Smart Lock met €50 korting en laten wij het gratis voor je installeren.</p>
+            <h3>Gratis installatie</h3>
+            <p>Bij afname van SmartStays komen wij je smartlock gratis installeren.</p>
           </div>
           <div className="promo-buttons">
             <Link to="/contact" className="promo-btn">Vraag offerte aan</Link>
@@ -115,7 +118,7 @@ function Home() {
 
       {/* Footer */}
       <footer className="home-footer">
-        <p>&copy; 2025 SmartStays. Alle rechten voorbehouden.</p>
+        <p>&copy; 2026 SmartStays. Alle rechten voorbehouden.</p>
         <p>info@smartstays.be</p>
       </footer>
     </div>

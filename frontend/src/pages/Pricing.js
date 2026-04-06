@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import SmartStaysLogo from '../components/SmartStaysLogo';
 import './Pricing.css';
+import Navbar from '../components/Navbar';
 
 function Pricing() {
   useEffect(() => {
@@ -110,12 +111,7 @@ function Pricing() {
 
   return (
     <div className="pricing-container">
-      <nav className="pricing-nav">
-        <div className="nav-brand">
-          <SmartStaysLogo className="nav-logo" />
-        </div>
-        <Link to="/" className="back-home">Terug naar home</Link>
-      </nav>
+      <Navbar />
 
       <div className="pricing-content">
         <h1>Ons aanbod</h1>

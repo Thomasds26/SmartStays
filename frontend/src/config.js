@@ -4,7 +4,7 @@
 const YOUR_IP = '192.168.0.152'; // Vervang door jouw IP-adres
 
 // Kies modus: 'local' voor laptop, 'network' voor telefoon
-const MODE = 'network'; // Verander naar 'network' voor telefoon
+const MODE = 'local'; // Verander naar 'network' voor telefoon
 
 const getApiUrl = () => {
   if (MODE === 'local') {
