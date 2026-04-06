@@ -1,4 +1,4 @@
-/* PropertyCalendar.css - Knoppen op andere plek, themakleur letters */
+/* PropertyCalendar.css */
 
 .property-calendar {
   background: white;
@@ -74,7 +74,7 @@
   width: 100%;
 }
 
-/* Toolbar - herschikte knoppen */
+/* Toolbar */
 .rbc-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -84,7 +84,7 @@
   gap: 12px;
 }
 
-/* Navigatie knoppen (◀ Vorige/Volgende ▶) links */
+/* Navigatie knoppen links */
 .rbc-btn-group:first-child {
   display: flex;
   gap: 6px;
@@ -117,9 +117,10 @@
   padding: 0;
   order: 0;
   text-align: center;
+  cursor: pointer;
 }
 
-/* View knoppen (Maand/Week/Dag) rechts */
+/* View knoppen rechts */
 .rbc-btn-group:last-child {
   display: flex;
   gap: 4px;

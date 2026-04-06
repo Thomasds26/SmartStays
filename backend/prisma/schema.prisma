@@ -29,8 +29,9 @@ model Property {
   address          String?
   ownerId          String
   cleaningDuration Int      @default(90)
-  airbnbIcalUrl    String?  // iCal URL voor Airbnb
-  bookingIcalUrl   String?  // iCal URL voor Booking.com
+  daysBetween      Int      @default(1)   // Aantal dagen tussen boekingen voor schoonmaak
+  airbnbIcalUrl    String?
+  bookingIcalUrl   String?
   createdAt        DateTime @default(now())
   
   owner          User            @relation(fields: [ownerId], references: [id])
@@ -66,7 +67,8 @@ model PersonalCode {
 model CleaningTask {
   id          String   @id @default(cuid())
   propertyId  String
-  scheduledAt DateTime
+  scheduledAt DateTime   // Start van schoonmaak periode
+  cleaningEnd DateTime?  // Eind van schoonmaak periode
   duration    Int
   status      String   @default("OPEN")
   cleanerId   String?
@@ -82,6 +84,7 @@ model CleaningReserve {
   id        String   @id @default(cuid())
   taskId    String
   cleanerId String
+  position  Int      @default(0)
   status    String   @default("PENDING")
   createdAt DateTime @default(now())
   

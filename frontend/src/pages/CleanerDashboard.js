@@ -17,7 +17,7 @@ function CleanerDashboard() {
   const [codeError, setCodeError] = useState('');
   const [activeTab, setActiveTab] = useState('available');
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  const [toast, setToast] = useState({ show: false, message: '', type: '' });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -45,12 +45,19 @@ function CleanerDashboard() {
     document.title = 'SmartStays - Schoonmaker Dashboard';
   }, [navigate]);
 
+  const showToast = (message, type) => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: '' }), 3000);
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
+      console.log('Fetching data for cleaner...');
+      
       const [openRes, myTasksRes, myReservesRes] = await Promise.all([
-        axios.get(`${API_URL}/api/cleaning-tasks?status=OPEN`, {
+        axios.get(`${API_URL}/api/cleaning-tasks?status=OPEN&withDetails=true`, {
           headers: { Authorization: `Bearer ${token}` }
         }),
         axios.get(`${API_URL}/api/my-tasks`, {
@@ -60,6 +67,11 @@ function CleanerDashboard() {
           headers: { Authorization: `Bearer ${token}` }
         })
       ]);
+      
+      console.log('Open taken:', openRes.data.length);
+      console.log('Mijn taken:', myTasksRes.data.length);
+      console.log('Mijn reserves:', myReservesRes.data.length);
+      
       setOpenTasks(openRes.data);
       setMyTasks(myTasksRes.data);
       setMyReserves(myReservesRes.data);
@@ -82,11 +94,25 @@ function CleanerDashboard() {
         await axios.post(`${API_URL}/api/cleaning-tasks/${taskId}/assign`, {}, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        setMessage('Taak succesvol toegewezen!');
+        showToast('Taak succesvol toegewezen!', 'success');
         fetchData();
-        setTimeout(() => setMessage(''), 3000);
       } catch (error) {
-        alert(error.response?.data?.error || 'Fout bij toewijzen');
+        showToast(error.response?.data?.error || 'Fout bij toewijzen', 'error');
+      }
+    }
+  };
+
+  const handleCancelAssignment = async (taskId) => {
+    if (window.confirm('Weet je zeker dat je je wilt afmelden voor deze taak? De eerste reserve wordt dan automatisch de nieuwe hoofdschoonmaker.')) {
+      try {
+        const token = localStorage.getItem('token');
+        await axios.post(`${API_URL}/api/cleaning-tasks/${taskId}/cancel-assignment`, {}, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        showToast('Je bent afgemeld voor deze taak', 'success');
+        fetchData();
+      } catch (error) {
+        showToast(error.response?.data?.error || 'Fout bij afmelden', 'error');
       }
     }
   };
@@ -97,11 +123,10 @@ function CleanerDashboard() {
       await axios.post(`${API_URL}/api/cleaning-tasks/${taskId}/reserve`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setMessage('Je staat nu op de reservelijst!');
+      showToast('Je staat nu op de reservelijst!', 'success');
       fetchData();
-      setTimeout(() => setMessage(''), 3000);
     } catch (error) {
-      alert(error.response?.data?.error || 'Fout bij reserveren');
+      showToast(error.response?.data?.error || 'Fout bij reserveren', 'error');
     }
   };
 
@@ -112,11 +137,10 @@ function CleanerDashboard() {
         await axios.delete(`${API_URL}/api/my-reserves/${reserveId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        setMessage('Reserve geannuleerd');
+        showToast('Reserve geannuleerd', 'success');
         fetchData();
-        setTimeout(() => setMessage(''), 3000);
       } catch (error) {
-        alert('Fout bij annuleren');
+        showToast('Fout bij annuleren', 'error');
       }
     }
   };
@@ -157,8 +181,7 @@ function CleanerDashboard() {
       setNewPersonalCode('');
       setConfirmPersonalCode('');
       setCodeError('');
-      setMessage('Persoonlijke code is gewijzigd!');
-      setTimeout(() => setMessage(''), 3000);
+      showToast('Persoonlijke code is gewijzigd!', 'success');
     } catch (error) {
       setCodeError(error.response?.data?.error || 'Fout bij wijzigen code');
     } finally {
@@ -189,6 +212,14 @@ function CleanerDashboard() {
     });
   };
 
+  const formatDateOnly = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('nl-NL', {
+      day: 'numeric',
+      month: 'short'
+    });
+  };
+
   if (!user) return <div>Laden...</div>;
 
   return (
@@ -203,8 +234,15 @@ function CleanerDashboard() {
         </div>
       </nav>
       
+      {toast.show && (
+        <div className={`toast-message ${toast.type}`}>
+          {toast.message}
+        </div>
+      )}
+      
       <div className="cleaner-content">
         <div className="cleaner-header">
+          <h1>Schoonmaker Dashboard</h1>
           <div className="tab-buttons">
             <button className={`tab-btn ${activeTab === 'available' ? 'active' : ''}`} onClick={() => setActiveTab('available')}>
               Beschikbare taken ({openTasks.length})
@@ -221,8 +259,6 @@ function CleanerDashboard() {
           </div>
         </div>
         
-        {message && <div className="success-message">{message}</div>}
-        
         {loading && <div className="loading">Laden...</div>}
         
         {!loading && activeTab === 'available' && (
@@ -230,29 +266,39 @@ function CleanerDashboard() {
             {openTasks.length === 0 ? (
               <div className="no-tasks">Geen beschikbare taken op dit moment</div>
             ) : (
-              openTasks.map(task => (
-                <div key={task.id} className="task-card">
-                  <div className="task-header">
-                    <h3>{task.property_name}</h3>
-                    <span className="task-status open">Beschikbaar</span>
+              openTasks.map(task => {
+                const startDate = new Date(task.scheduledAt);
+                const endDate = task.cleaningEnd ? new Date(task.cleaningEnd) : startDate;
+                const isPeriod = startDate.toDateString() !== endDate.toDateString();
+                
+                return (
+                  <div key={task.id} className="task-card">
+                    <div className="task-header">
+                      <h3>{task.property_name}</h3>
+                      <span className="task-status open">Beschikbaar</span>
+                    </div>
+                    <div className="task-details">
+                      <p><strong>Schoonmaak periode:</strong> {isPeriod ? (
+                        <>{formatDateOnly(task.scheduledAt)} - {formatDateOnly(task.cleaningEnd)}</>
+                      ) : (
+                        formatDate(task.scheduledAt)
+                      )}</p>
+                      <p><strong>Duur:</strong> {task.duration} minuten</p>
+                      <p><strong>Adres:</strong> {task.address || 'Geen adres'}</p>
+                      {task.notes && <p><strong>Notities:</strong> {task.notes}</p>}
+                      <p><strong>Reserves:</strong> {task.reserve_count}/3</p>
+                    </div>
+                    <div className="task-actions">
+                      <button onClick={() => handleAssignTask(task.id)} className="assign-btn">
+                        Taak uitvoeren
+                      </button>
+                      <button onClick={() => handleReserveTask(task.id)} className="reserve-btn" disabled={task.reserve_count >= 3}>
+                        {task.reserve_count >= 3 ? 'Reservelijst vol' : 'Als reserve'}
+                      </button>
+                    </div>
                   </div>
-                  <div className="task-details">
-                    <p><strong>Datum:</strong> {formatDate(task.scheduledAt)}</p>
-                    <p><strong>Duur:</strong> {task.duration} minuten</p>
-                    <p><strong>Adres:</strong> {task.address || 'Geen adres'}</p>
-                    {task.notes && <p><strong>Notities:</strong> {task.notes}</p>}
-                    <p><strong>Reserves:</strong> {task.reserve_count}/3</p>
-                  </div>
-                  <div className="task-actions">
-                    <button onClick={() => handleAssignTask(task.id)} className="assign-btn">
-                      Taak uitvoeren
-                    </button>
-                    <button onClick={() => handleReserveTask(task.id)} className="reserve-btn" disabled={task.reserve_count >= 3}>
-                      {task.reserve_count >= 3 ? 'Reservelijst vol' : 'Als reserve'}
-                    </button>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         )}
@@ -262,20 +308,35 @@ function CleanerDashboard() {
             {myTasks.length === 0 ? (
               <div className="no-tasks">Je hebt nog geen taken toegewezen</div>
             ) : (
-              myTasks.map(task => (
-                <div key={task.id} className="task-card assigned">
-                  <div className="task-header">
-                    <h3>{task.property_name}</h3>
-                    <span className="task-status assigned">Toegewezen</span>
+              myTasks.map(task => {
+                const startDate = new Date(task.scheduledAt);
+                const endDate = task.cleaningEnd ? new Date(task.cleaningEnd) : startDate;
+                const isPeriod = startDate.toDateString() !== endDate.toDateString();
+                
+                return (
+                  <div key={task.id} className="task-card assigned">
+                    <div className="task-header">
+                      <h3>{task.property_name}</h3>
+                      <span className="task-status assigned">Toegewezen</span>
+                    </div>
+                    <div className="task-details">
+                      <p><strong>Schoonmaak periode:</strong> {isPeriod ? (
+                        <>{formatDateOnly(task.scheduledAt)} - {formatDateOnly(task.cleaningEnd)}</>
+                      ) : (
+                        formatDate(task.scheduledAt)
+                      )}</p>
+                      <p><strong>Duur:</strong> {task.duration} minuten</p>
+                      <p><strong>Adres:</strong> {task.address || 'Geen adres'}</p>
+                      {task.notes && <p><strong>Notities:</strong> {task.notes}</p>}
+                    </div>
+                    <div className="task-actions">
+                      <button onClick={() => handleCancelAssignment(task.id)} className="cancel-btn">
+                        Afmelden
+                      </button>
+                    </div>
                   </div>
-                  <div className="task-details">
-                    <p><strong>Datum:</strong> {formatDate(task.scheduledAt)}</p>
-                    <p><strong>Duur:</strong> {task.duration} minuten</p>
-                    <p><strong>Adres:</strong> {task.address || 'Geen adres'}</p>
-                    {task.notes && <p><strong>Notities:</strong> {task.notes}</p>}
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         )}
@@ -285,27 +346,37 @@ function CleanerDashboard() {
             {myReserves.length === 0 ? (
               <div className="no-tasks">Je staat nergens op de reservelijst</div>
             ) : (
-              myReserves.map(reserve => (
-                <div key={reserve.id} className="task-card reserve">
-                  <div className="task-header">
-                    <h3>{reserve.property_name}</h3>
-                    <span className="task-status reserve">Reserve</span>
+              myReserves.map(reserve => {
+                const startDate = new Date(reserve.scheduledAt);
+                const endDate = reserve.cleaningEnd ? new Date(reserve.cleaningEnd) : startDate;
+                const isPeriod = startDate.toDateString() !== endDate.toDateString();
+                
+                return (
+                  <div key={reserve.id} className="task-card reserve">
+                    <div className="task-header">
+                      <h3>{reserve.property_name}</h3>
+                      <span className="task-status reserve">Reserve #{reserve.position || '?'}</span>
+                    </div>
+                    <div className="task-details">
+                      <p><strong>Schoonmaak periode:</strong> {isPeriod ? (
+                        <>{formatDateOnly(reserve.scheduledAt)} - {formatDateOnly(reserve.cleaningEnd)}</>
+                      ) : (
+                        formatDate(reserve.scheduledAt)
+                      )}</p>
+                      <p><strong>Duur:</strong> {reserve.duration} minuten</p>
+                      <p><strong>Adres:</strong> {reserve.address || 'Geen adres'}</p>
+                      {reserve.cleaner_name && (
+                        <p><strong>Toegewezen aan:</strong> {reserve.cleaner_name}</p>
+                      )}
+                    </div>
+                    <div className="task-actions">
+                      <button onClick={() => handleCancelReserve(reserve.id)} className="cancel-btn">
+                        Annuleer reserve
+                      </button>
+                    </div>
                   </div>
-                  <div className="task-details">
-                    <p><strong>Datum:</strong> {formatDate(reserve.scheduledAt)}</p>
-                    <p><strong>Duur:</strong> {reserve.duration} minuten</p>
-                    <p><strong>Adres:</strong> {reserve.address || 'Geen adres'}</p>
-                    {reserve.cleaner_name && (
-                      <p><strong>Toegewezen aan:</strong> {reserve.cleaner_name}</p>
-                    )}
-                  </div>
-                  <div className="task-actions">
-                    <button onClick={() => handleCancelReserve(reserve.id)} className="cancel-btn">
-                      Annuleer reserve
-                    </button>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         )}

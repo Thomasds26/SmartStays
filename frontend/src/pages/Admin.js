@@ -29,6 +29,7 @@ function Admin() {
     address: '', 
     ownerId: '',
     cleaningDuration: 90,
+    daysBetween: 1,
     airbnbIcalUrl: '',
     bookingIcalUrl: ''
   });
@@ -169,9 +170,10 @@ function Admin() {
   const fetchCleaningTasks = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/api/cleaning-tasks`, {
+      const response = await axios.get(`${API_URL}/api/cleaning-tasks?withDetails=true`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      console.log('Aantal cleaning tasks voor admin:', response.data.length);
       setCleaningTasks(response.data);
     } catch (error) {
       console.error('Fout bij ophalen taken:', error);
@@ -242,6 +244,7 @@ function Admin() {
         address: '', 
         ownerId: '',
         cleaningDuration: 90,
+        daysBetween: 1,
         airbnbIcalUrl: '',
         bookingIcalUrl: ''
       });
@@ -264,6 +267,7 @@ function Admin() {
         address: editingProperty.address,
         ownerId: editingProperty.ownerId,
         cleaningDuration: editingProperty.cleaningDuration,
+        daysBetween: editingProperty.daysBetween,
         airbnbIcalUrl: editingProperty.airbnbIcalUrl,
         bookingIcalUrl: editingProperty.bookingIcalUrl
       }, {
@@ -506,6 +510,7 @@ function Admin() {
                     <th>Naam</th>
                     <th>Adres</th>
                     <th>Verhuurder</th>
+                    <th>Dagen tussen</th>
                     <th>Airbnb iCal</th>
                     <th>Booking iCal</th>
                     <th>Acties</th>
@@ -517,6 +522,7 @@ function Admin() {
                       <td>{p.name}</td>
                       <td>{p.address || '-'}</td>
                       <td>{p.owner_name || p.owner_email || '-'}</td>
+                      <td>{p.daysBetween || 1} {p.daysBetween === 1 ? 'dag' : 'dagen'}</td>
                       <td>{p.airbnbIcalUrl ? '✓' : '-'}</td>
                       <td>{p.bookingIcalUrl ? '✓' : '-'}</td>
                       <td>
@@ -540,7 +546,7 @@ function Admin() {
           <>
             <div className="section-header">
               <h2>Schoonmaak kalender</h2>
-              <p className="info-text">Taken worden automatisch gegenereerd op basis van boekingen uit Airbnb en Booking.com</p>
+              <p className="info-text">Overzicht van alle schoonmaak taken en reserves</p>
             </div>
             
             <div className="calendar-container">
@@ -554,28 +560,60 @@ function Admin() {
                   </div>
                   <h3>Geen schoonmaak taken</h3>
                   <p>Er zijn nog geen schoonmaak taken gegenereerd.</p>
-                  <p className="placeholder-note">Taken verschijnen hier zodra er boekingen worden gesynchroniseerd met Airbnb of Booking.com.</p>
+                  <p className="placeholder-note">Taken verschijnen hier zodra er boekingen worden gesynchroniseerd.</p>
                 </div>
               ) : (
                 <div className="tasks-calendar">
-                  {filteredTasks.map(task => (
-                    <div key={task.id} className="calendar-task-card">
-                      <div className="task-time">{formatDate(task.scheduledAt)}</div>
-                      <div className="task-info">
-                        <h4>{task.property_name}</h4>
-                        <p>{task.address}</p>
-                        <p className="task-duration">Duur: {task.duration} minuten</p>
+                  {filteredTasks.map(task => {
+                    const reserves = task.reserves || [];
+                    const startDate = new Date(task.scheduledAt);
+                    const endDate = task.cleaningEnd ? new Date(task.cleaningEnd) : startDate;
+                    const isPeriod = startDate.toDateString() !== endDate.toDateString();
+                    
+                    return (
+                      <div key={task.id} className="calendar-task-card">
+                        <div className="task-time">
+                          {isPeriod ? (
+                            <>{startDate.toLocaleDateString('nl-NL')} - {endDate.toLocaleDateString('nl-NL')}</>
+                          ) : (
+                            startDate.toLocaleDateString('nl-NL')
+                          )}
+                        </div>
+                        <div className="task-info">
+                          <h4>{task.property_name}</h4>
+                          <p><strong>Adres:</strong> {task.address || 'Geen adres'}</p>
+                          <p><strong>Verhuurder:</strong> {task.owner_name || 'Onbekend'}</p>
+                          {task.guest_name && (
+                            <p><strong>Gast:</strong> {task.guest_name}{task.guest_email ? ` (${task.guest_email})` : ''}</p>
+                          )}
+                          {task.booking_check_in && task.booking_check_out && (
+                            <p><strong>Boeking:</strong> {new Date(task.booking_check_in).toLocaleDateString('nl-NL')} - {new Date(task.booking_check_out).toLocaleDateString('nl-NL')}</p>
+                          )}
+                          <p><strong>Duur:</strong> {task.duration} minuten</p>
+                        </div>
+                        <div className="task-status-badge">
+                          <div>
+                            <span className={`status-badge ${task.status === 'OPEN' ? 'status-pending' : 'status-active'}`}>
+                              {task.status === 'OPEN' ? 'Open' : 'Toegewezen'}
+                            </span>
+                          </div>
+                          {task.cleaner_name && (
+                            <div className="cleaner-info">
+                              <span className="cleaner-name">Schoonmaker: {task.cleaner_name}</span>
+                            </div>
+                          )}
+                          {reserves.length > 0 && (
+                            <div className="reserves-list">
+                              <strong>Reserves:</strong>
+                              {reserves.map(r => (
+                                <span key={r.id} className="reserve-name">#{r.position} {r.cleaner_name}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="task-status-badge">
-                        <span className={`status-badge ${task.status === 'OPEN' ? 'status-pending' : 'status-active'}`}>
-                          {task.status === 'OPEN' ? 'Open' : 'Toegewezen'}
-                        </span>
-                        {task.cleaner_name && (
-                          <span className="cleaner-name">Schoonmaker: {task.cleaner_name}</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -583,7 +621,7 @@ function Admin() {
         )}
       </div>
 
-      {/* Modal nieuwe gebruiker */}
+      {/* Modals - hetzelfde als eerder */}
       {showUserModal && (
         <div className="modal-overlay" onClick={() => setShowUserModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -594,13 +632,7 @@ function Admin() {
             <form onSubmit={handleAddUser}>
               <div className="form-group">
                 <label>Email *</label>
-                <input 
-                  type="email" 
-                  value={newUser.email} 
-                  onChange={(e) => setNewUser({...newUser, email: e.target.value})} 
-                  required 
-                  placeholder="naam@email.com" 
-                />
+                <input type="email" value={newUser.email} onChange={(e) => setNewUser({...newUser, email: e.target.value})} required placeholder="naam@email.com" />
               </div>
               <div className="form-group">
                 <label>Rol *</label>
@@ -619,7 +651,6 @@ function Admin() {
         </div>
       )}
 
-      {/* Modal bewerk gebruiker */}
       {showEditUserModal && editingUser && (
         <div className="modal-overlay" onClick={() => setShowEditUserModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -630,21 +661,11 @@ function Admin() {
             <form onSubmit={handleEditUser}>
               <div className="form-group">
                 <label>Naam</label>
-                <input 
-                  type="text" 
-                  value={editingUser.name || ''} 
-                  onChange={(e) => setEditingUser({...editingUser, name: e.target.value})} 
-                  placeholder="Naam"
-                />
+                <input type="text" value={editingUser.name || ''} onChange={(e) => setEditingUser({...editingUser, name: e.target.value})} placeholder="Naam" />
               </div>
               <div className="form-group">
                 <label>Email *</label>
-                <input 
-                  type="email" 
-                  value={editingUser.email} 
-                  onChange={(e) => setEditingUser({...editingUser, email: e.target.value})} 
-                  required 
-                />
+                <input type="email" value={editingUser.email} onChange={(e) => setEditingUser({...editingUser, email: e.target.value})} required />
               </div>
               <div className="form-group">
                 <label>Rol *</label>
@@ -663,7 +684,6 @@ function Admin() {
         </div>
       )}
 
-      {/* Modal nieuwe woning */}
       {showPropertyModal && (
         <div className="modal-overlay" onClick={() => setShowPropertyModal(false)}>
           <div className="modal property-modal" onClick={(e) => e.stopPropagation()}>
@@ -674,47 +694,24 @@ function Admin() {
             <form onSubmit={handleAddProperty}>
               <div className="form-group">
                 <label>Naam *</label>
-                <input 
-                  type="text" 
-                  value={newProperty.name} 
-                  onChange={(e) => setNewProperty({...newProperty, name: e.target.value})} 
-                  required 
-                  placeholder="Bijv. Zonnewende 12" 
-                />
+                <input type="text" value={newProperty.name} onChange={(e) => setNewProperty({...newProperty, name: e.target.value})} required placeholder="Bijv. Zonnewende 12" />
               </div>
               <div className="form-group">
                 <label>Adres</label>
-                <input 
-                  type="text" 
-                  value={newProperty.address} 
-                  onChange={(e) => setNewProperty({...newProperty, address: e.target.value})} 
-                  placeholder="Straat, nummer, stad" 
-                />
+                <input type="text" value={newProperty.address} onChange={(e) => setNewProperty({...newProperty, address: e.target.value})} placeholder="Straat, nummer, stad" />
               </div>
               <div className="form-group">
                 <label>Verhuurder *</label>
-                <input
-                  type="text"
-                  placeholder="Zoek op naam of email..."
-                  value={userSearchTerm}
-                  onChange={(e) => setUserSearchTerm(e.target.value)}
-                  className="search-select-input"
-                />
+                <input type="text" placeholder="Zoek op naam of email..." value={userSearchTerm} onChange={(e) => setUserSearchTerm(e.target.value)} className="search-select-input" />
                 
                 {!newProperty.ownerId && userSearchTerm && (
                   <div className="select-dropdown">
-                    {filteredUsersList.length === 0 && (
-                      <div className="dropdown-empty">Geen verhuurders gevonden</div>
-                    )}
+                    {filteredUsersList.length === 0 && <div className="dropdown-empty">Geen verhuurders gevonden</div>}
                     {filteredUsersList.map(u => (
-                      <div 
-                        key={u.id}
-                        className="dropdown-item"
-                        onClick={() => {
-                          setNewProperty({...newProperty, ownerId: u.id});
-                          setUserSearchTerm(`${u.name || u.email}`);
-                        }}
-                      >
+                      <div key={u.id} className="dropdown-item" onClick={() => {
+                        setNewProperty({...newProperty, ownerId: u.id});
+                        setUserSearchTerm(`${u.name || u.email}`);
+                      }}>
                         <div className="dropdown-name">{u.name || 'Geen naam'}</div>
                         <div className="dropdown-email">{u.email}</div>
                       </div>
@@ -730,55 +727,44 @@ function Admin() {
                 
                 {newProperty.ownerId && (
                   <div className="selected-info">
-                    <span>
-                      Geselecteerd: {usersList.find(u => u.id === newProperty.ownerId)?.name || 
-                                    usersList.find(u => u.id === newProperty.ownerId)?.email}
-                    </span>
-                    <button 
-                      type="button"
-                      className="deselect-btn"
-                      onClick={() => {
-                        setNewProperty({...newProperty, ownerId: ''});
-                        setUserSearchTerm('');
-                      }}
-                    >
-                      Verwijderen
-                    </button>
+                    <span>Geselecteerd: {usersList.find(u => u.id === newProperty.ownerId)?.name || usersList.find(u => u.id === newProperty.ownerId)?.email}</span>
+                    <button type="button" className="deselect-btn" onClick={() => {
+                      setNewProperty({...newProperty, ownerId: ''});
+                      setUserSearchTerm('');
+                    }}>Verwijderen</button>
                   </div>
                 )}
               </div>
               
               <div className="form-group">
                 <label>Schoonmaak duur (minuten)</label>
-                <input 
-                  type="number" 
-                  value={newProperty.cleaningDuration} 
-                  onChange={(e) => setNewProperty({...newProperty, cleaningDuration: parseInt(e.target.value) || 90})} 
-                  min="30" 
-                  max="240"
-                />
+                <input type="number" value={newProperty.cleaningDuration} onChange={(e) => setNewProperty({...newProperty, cleaningDuration: parseInt(e.target.value) || 90})} min="30" max="240" />
+              </div>
+              
+              <div className="form-group">
+                <label>Dagen tussen boekingen</label>
+                <select value={newProperty.daysBetween} onChange={(e) => setNewProperty({...newProperty, daysBetween: parseInt(e.target.value)})}>
+                  <option value="0">0 (zelfde dag)</option>
+                  <option value="1">1 dag</option>
+                  <option value="2">2 dagen</option>
+                  <option value="3">3 dagen</option>
+                  <option value="4">4 dagen</option>
+                  <option value="5">5 dagen</option>
+                  <option value="6">6 dagen</option>
+                  <option value="7">7 dagen</option>
+                </select>
               </div>
               
               <div className="form-group">
                 <label>Airbnb iCal URL</label>
-                <input 
-                  type="url" 
-                  value={newProperty.airbnbIcalUrl} 
-                  onChange={(e) => setNewProperty({...newProperty, airbnbIcalUrl: e.target.value})} 
-                  placeholder="https://www.airbnb.nl/calendar/ical/..." 
-                />
-                <small className="help-text">Hoe vind je je iCal URL? Ga naar Inbox → Kalender → Export kalender → Kopieer iCal link</small>
+                <input type="url" value={newProperty.airbnbIcalUrl} onChange={(e) => setNewProperty({...newProperty, airbnbIcalUrl: e.target.value})} placeholder="https://www.airbnb.nl/calendar/ical/..." />
+                <small className="help-text">Kopieer de iCal link uit je Airbnb kalender.</small>
               </div>
               
               <div className="form-group">
                 <label>Booking.com iCal URL</label>
-                <input 
-                  type="url" 
-                  value={newProperty.bookingIcalUrl} 
-                  onChange={(e) => setNewProperty({...newProperty, bookingIcalUrl: e.target.value})} 
-                  placeholder="https://www.booking.com/ical/..." 
-                />
-                <small className="help-text">Ga naar Kalender → iCal export → Kopieer link</small>
+                <input type="url" value={newProperty.bookingIcalUrl} onChange={(e) => setNewProperty({...newProperty, bookingIcalUrl: e.target.value})} placeholder="https://www.booking.com/ical/..." />
+                <small className="help-text">Kopieer de iCal link uit je Booking.com kalender.</small>
               </div>
               
               <div className="modal-buttons">
@@ -790,7 +776,6 @@ function Admin() {
         </div>
       )}
 
-      {/* Modal bewerk woning */}
       {showEditPropertyModal && editingProperty && (
         <div className="modal-overlay" onClick={() => setShowEditPropertyModal(false)}>
           <div className="modal property-modal" onClick={(e) => e.stopPropagation()}>
@@ -801,28 +786,15 @@ function Admin() {
             <form onSubmit={handleEditProperty}>
               <div className="form-group">
                 <label>Naam *</label>
-                <input 
-                  type="text" 
-                  value={editingProperty.name} 
-                  onChange={(e) => setEditingProperty({...editingProperty, name: e.target.value})} 
-                  required 
-                />
+                <input type="text" value={editingProperty.name} onChange={(e) => setEditingProperty({...editingProperty, name: e.target.value})} required />
               </div>
               <div className="form-group">
                 <label>Adres</label>
-                <input 
-                  type="text" 
-                  value={editingProperty.address || ''} 
-                  onChange={(e) => setEditingProperty({...editingProperty, address: e.target.value})} 
-                />
+                <input type="text" value={editingProperty.address || ''} onChange={(e) => setEditingProperty({...editingProperty, address: e.target.value})} />
               </div>
               <div className="form-group">
                 <label>Verhuurder *</label>
-                <select 
-                  value={editingProperty.ownerId} 
-                  onChange={(e) => setEditingProperty({...editingProperty, ownerId: e.target.value})}
-                  required
-                >
+                <select value={editingProperty.ownerId} onChange={(e) => setEditingProperty({...editingProperty, ownerId: e.target.value})} required>
                   <option value="">Selecteer verhuurder</option>
                   {usersList.map(u => (
                     <option key={u.id} value={u.id}>{u.name || u.email}</option>
@@ -832,31 +804,31 @@ function Admin() {
               
               <div className="form-group">
                 <label>Schoonmaak duur (minuten)</label>
-                <input 
-                  type="number" 
-                  value={editingProperty.cleaningDuration || 90} 
-                  onChange={(e) => setEditingProperty({...editingProperty, cleaningDuration: parseInt(e.target.value) || 90})} 
-                  min="30" 
-                  max="240"
-                />
+                <input type="number" value={editingProperty.cleaningDuration || 90} onChange={(e) => setEditingProperty({...editingProperty, cleaningDuration: parseInt(e.target.value) || 90})} min="30" max="240" />
+              </div>
+              
+              <div className="form-group">
+                <label>Dagen tussen boekingen</label>
+                <select value={editingProperty.daysBetween || 1} onChange={(e) => setEditingProperty({...editingProperty, daysBetween: parseInt(e.target.value)})}>
+                  <option value="0">0 (zelfde dag)</option>
+                  <option value="1">1 dag</option>
+                  <option value="2">2 dagen</option>
+                  <option value="3">3 dagen</option>
+                  <option value="4">4 dagen</option>
+                  <option value="5">5 dagen</option>
+                  <option value="6">6 dagen</option>
+                  <option value="7">7 dagen</option>
+                </select>
               </div>
               
               <div className="form-group">
                 <label>Airbnb iCal URL</label>
-                <input 
-                  type="url" 
-                  value={editingProperty.airbnbIcalUrl || ''} 
-                  onChange={(e) => setEditingProperty({...editingProperty, airbnbIcalUrl: e.target.value})} 
-                />
+                <input type="url" value={editingProperty.airbnbIcalUrl || ''} onChange={(e) => setEditingProperty({...editingProperty, airbnbIcalUrl: e.target.value})} />
               </div>
               
               <div className="form-group">
                 <label>Booking.com iCal URL</label>
-                <input 
-                  type="url" 
-                  value={editingProperty.bookingIcalUrl || ''} 
-                  onChange={(e) => setEditingProperty({...editingProperty, bookingIcalUrl: e.target.value})} 
-                />
+                <input type="url" value={editingProperty.bookingIcalUrl || ''} onChange={(e) => setEditingProperty({...editingProperty, bookingIcalUrl: e.target.value})} />
               </div>
               
               <div className="modal-buttons">
@@ -868,7 +840,6 @@ function Admin() {
         </div>
       )}
 
-      {/* Delete bevestiging */}
       {deleteConfirm && (
         <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
           <div className="modal delete-modal" onClick={(e) => e.stopPropagation()}>
@@ -879,12 +850,7 @@ function Admin() {
             <p className="delete-warning">Deze actie kan niet ongedaan worden gemaakt.</p>
             <div className="modal-buttons">
               <button onClick={() => setDeleteConfirm(null)} className="cancel-btn">Annuleren</button>
-              <button 
-                onClick={() => deleteConfirm.type === 'user' ? handleDeleteUser(deleteConfirm.id, deleteConfirm.name) : handleDeleteProperty(deleteConfirm.id, deleteConfirm.name)} 
-                className="delete-confirm-btn"
-              >
-                Verwijderen
-              </button>
+              <button onClick={() => deleteConfirm.type === 'user' ? handleDeleteUser(deleteConfirm.id, deleteConfirm.name) : handleDeleteProperty(deleteConfirm.id, deleteConfirm.name)} className="delete-confirm-btn">Verwijderen</button>
             </div>
           </div>
         </div>

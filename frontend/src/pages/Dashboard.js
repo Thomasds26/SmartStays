@@ -15,6 +15,8 @@ function Dashboard() {
   const [batteryLevel] = useState(85);
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [showAddCodeModal, setShowAddCodeModal] = useState(false);
+  const [showEditPropertyModal, setShowEditPropertyModal] = useState(false);
+  const [editingProperty, setEditingProperty] = useState(null);
   const [editingCodeId, setEditingCodeId] = useState(null);
   const [editingCodeName, setEditingCodeName] = useState('');
   const [newCodeName, setNewCodeName] = useState('');
@@ -22,6 +24,7 @@ function Dashboard() {
   const [confirmCodeValue, setConfirmCodeValue] = useState('');
   const [codeError, setCodeError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState({ show: false, message: '', type: '' });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -48,6 +51,11 @@ function Dashboard() {
     fetchPersonalCodes();
     document.title = 'SmartStays - My Dashboard';
   }, [navigate]);
+
+  const showToast = (message, type) => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: '' }), 3000);
+  };
 
   const fetchProperties = async () => {
     try {
@@ -84,19 +92,32 @@ function Dashboard() {
     }
   };
 
-  const handleEditProperty = async (propertyId, currentName) => {
-    const newName = prompt('Pas de naam van je woning aan:', currentName);
-    if (newName && newName !== currentName) {
-      try {
-        const token = localStorage.getItem('token');
-        await axios.put(`${API_URL}/api/properties/${propertyId}`, 
-          { name: newName, address: '' },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        fetchProperties();
-      } catch (error) {
-        alert('Fout bij aanpassen naam');
-      }
+  const openEditPropertyModal = (property) => {
+    setEditingProperty({ ...property });
+    setShowEditPropertyModal(true);
+  };
+
+  const handleEditPropertySave = async (e) => {
+    e.preventDefault();
+    if (!editingProperty) return;
+    
+    try {
+      const token = localStorage.getItem('token');
+      await axios.put(`${API_URL}/api/properties/${editingProperty.id}`, {
+        name: editingProperty.name,
+        address: editingProperty.address,
+        daysBetween: editingProperty.daysBetween,
+        airbnbIcalUrl: editingProperty.airbnbIcalUrl,
+        bookingIcalUrl: editingProperty.bookingIcalUrl
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setShowEditPropertyModal(false);
+      setEditingProperty(null);
+      fetchProperties();
+      showToast('Woning bijgewerkt!', 'success');
+    } catch (error) {
+      showToast('Fout bij bijwerken', 'error');
     }
   };
 
@@ -140,6 +161,7 @@ function Dashboard() {
       setNewCodeValue('');
       setConfirmCodeValue('');
       setCodeError('');
+      showToast('Code toegevoegd!', 'success');
     } catch (error) {
       setCodeError(error.response?.data?.error || 'Fout bij toevoegen code');
     } finally {
@@ -180,6 +202,7 @@ function Dashboard() {
       setNewCodeValue('');
       setConfirmCodeValue('');
       setCodeError('');
+      showToast('Code gewijzigd!', 'success');
     } catch (error) {
       setCodeError(error.response?.data?.error || 'Fout bij wijzigen code');
     } finally {
@@ -197,8 +220,9 @@ function Dashboard() {
         });
         
         setPersonalCodes(personalCodes.filter(c => c.id !== codeId));
+        showToast('Code verwijderd!', 'success');
       } catch (error) {
-        alert('Fout bij verwijderen code');
+        showToast('Fout bij verwijderen', 'error');
       } finally {
         setLoading(false);
       }
@@ -241,6 +265,12 @@ function Dashboard() {
         </div>
       </nav>
       
+      {toast.show && (
+        <div className={`toast-message ${toast.type}`}>
+          {toast.message}
+        </div>
+      )}
+      
       <div className="dashboard-layout">
         <aside className="dashboard-sidebar">
           <div className="sidebar-header">
@@ -262,10 +292,10 @@ function Dashboard() {
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleEditProperty(prop.id, prop.name);
+                    openEditPropertyModal(prop);
                   }}
                   className="edit-property-btn"
-                  title="Naam aanpassen"
+                  title="Bewerken"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path d="M17 3L21 7L7 21H3V17L17 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
@@ -377,6 +407,83 @@ function Dashboard() {
           )}
         </main>
       </div>
+
+      {/* Modal voor woning bewerken */}
+      {showEditPropertyModal && editingProperty && (
+        <div className="modal-overlay" onClick={() => setShowEditPropertyModal(false)}>
+          <div className="modal property-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Woning bewerken</h2>
+              <button className="modal-close" onClick={() => setShowEditPropertyModal(false)}>✖</button>
+            </div>
+            <form onSubmit={handleEditPropertySave}>
+              <div className="form-group">
+                <label>Naam</label>
+                <input 
+                  type="text" 
+                  value={editingProperty.name} 
+                  onChange={(e) => setEditingProperty({...editingProperty, name: e.target.value})} 
+                  required 
+                />
+              </div>
+              
+              <div className="form-group">
+                <label>Adres</label>
+                <input 
+                  type="text" 
+                  value={editingProperty.address || ''} 
+                  onChange={(e) => setEditingProperty({...editingProperty, address: e.target.value})} 
+                />
+              </div>
+              
+              <div className="form-group">
+                <label>Schoonmaak interval (dagen tussen boekingen)</label>
+                <select 
+                  value={editingProperty.daysBetween || 1} 
+                  onChange={(e) => setEditingProperty({...editingProperty, daysBetween: parseInt(e.target.value)})}
+                >
+                  <option value="0">0 dagen (zelfde dag)</option>
+                  <option value="1">1 dag</option>
+                  <option value="2">2 dagen</option>
+                  <option value="3">3 dagen</option>
+                  <option value="4">4 dagen</option>
+                  <option value="5">5 dagen</option>
+                  <option value="6">6 dagen</option>
+                  <option value="7">7 dagen</option>
+                </select>
+                <small>De schoonmaker heeft deze tijd om de woning te kuisen.</small>
+              </div>
+              
+              <div className="form-group">
+                <label>Airbnb iCal URL</label>
+                <input 
+                  type="url" 
+                  value={editingProperty.airbnbIcalUrl || ''} 
+                  onChange={(e) => setEditingProperty({...editingProperty, airbnbIcalUrl: e.target.value})} 
+                  placeholder="https://www.airbnb.nl/calendar/ical/..." 
+                />
+                <small>Kopieer de iCal link uit je Airbnb kalender.</small>
+              </div>
+              
+              <div className="form-group">
+                <label>Booking.com iCal URL</label>
+                <input 
+                  type="url" 
+                  value={editingProperty.bookingIcalUrl || ''} 
+                  onChange={(e) => setEditingProperty({...editingProperty, bookingIcalUrl: e.target.value})} 
+                  placeholder="https://www.booking.com/ical/..." 
+                />
+                <small>Kopieer de iCal link uit je Booking.com kalender.</small>
+              </div>
+              
+              <div className="modal-buttons">
+                <button type="button" onClick={() => setShowEditPropertyModal(false)} className="cancel-btn">Annuleren</button>
+                <button type="submit" className="submit-btn">Opslaan</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Modal voor code wijzigen */}
       {showCodeModal && (

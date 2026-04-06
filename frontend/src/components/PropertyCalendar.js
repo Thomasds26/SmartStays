@@ -69,25 +69,48 @@ function PropertyCalendar({ propertyId, propertyName }) {
         })
       ]);
       
-      const bookingEvents = calendarRes.data.map(booking => ({
-        id: booking.id,
-        title: `${booking.guestName || 'Gast'} - ${booking.platform}`,
-        start: new Date(booking.checkIn),
-        end: new Date(booking.checkOut),
-        type: 'booking',
-        backgroundColor: '#1e88e5'
-      }));
+      // Boekingen - blauw van check-in tot check-out
+      const bookingEvents = calendarRes.data.map(booking => {
+        // Einddatum: check-out datum (FullCalendar toont tot deze dag)
+        const endDate = new Date(booking.checkOut);
+        
+        return {
+          id: booking.id,
+          title: `${booking.guestName || 'Gast'} - ${booking.platform}`,
+          start: new Date(booking.checkIn),
+          end: endDate,
+          type: 'booking',
+          backgroundColor: '#1e88e5',
+          borderColor: '#1e88e5',
+          textColor: 'white'
+        };
+      });
       
+      // Schoonmaak taken - groen van check-out tot check-out + daysBetween
       const cleaningEvents = cleaningRes.data
         .filter(task => task.propertyId === propertyId)
-        .map(task => ({
-          id: `clean-${task.id}`,
-          title: `Schoonmaak - ${task.duration} min`,
-          start: new Date(task.scheduledAt),
-          end: new Date(new Date(task.scheduledAt).getTime() + task.duration * 60000),
-          type: 'cleaning',
-          backgroundColor: '#4caf50'
-        }));
+        .map(task => {
+          const startDate = new Date(task.scheduledAt);
+          const endDate = task.cleaningEnd ? new Date(task.cleaningEnd) : startDate;
+          
+          let title = `Schoonmaak - ${task.duration} min`;
+          if (task.cleaningEnd) {
+            const startStr = startDate.toLocaleDateString('nl-NL');
+            const endStr = new Date(task.cleaningEnd).toLocaleDateString('nl-NL');
+            title = `Schoonmaak ${startStr} - ${endStr}`;
+          }
+          
+          return {
+            id: `clean-${task.id}`,
+            title: title,
+            start: startDate,
+            end: endDate,
+            type: 'cleaning',
+            backgroundColor: '#4caf50',
+            borderColor: '#4caf50',
+            textColor: 'white'
+          };
+        });
       
       setEvents([...bookingEvents, ...cleaningEvents]);
       setLoading(false);
@@ -118,7 +141,9 @@ function PropertyCalendar({ propertyId, propertyName }) {
     if (event.type === 'booking') {
       alert(`Boeking: ${event.title}\nVan: ${moment(event.start).format('DD-MM-YYYY HH:mm')}\nTot: ${moment(event.end).format('DD-MM-YYYY HH:mm')}`);
     } else {
-      alert(`Schoonmaak taak: ${event.title}\nDatum: ${moment(event.start).format('DD-MM-YYYY HH:mm')}`);
+      const startStr = moment(event.start).format('DD-MM-YYYY');
+      const endStr = moment(event.end).format('DD-MM-YYYY');
+      alert(`Schoonmaak taak: ${event.title}\nPeriode: ${startStr} - ${endStr}`);
     }
   };
 
@@ -130,12 +155,10 @@ function PropertyCalendar({ propertyId, propertyName }) {
     setCurrentView(view);
   };
 
-  // Formatteer de datum voor weergave (bijv. "april 2026")
   const formatMonthYear = (date) => {
     return moment(date).format('MMMM YYYY');
   };
 
-  // Custom toolbar met maand/jaar label
   const CustomToolbar = (toolbar) => {
     const goToBack = () => toolbar.onNavigate('PREV');
     const goToNext = () => toolbar.onNavigate('NEXT');
@@ -203,7 +226,7 @@ function PropertyCalendar({ propertyId, propertyName }) {
         </div>
         <div className="legend-item">
           <span className="legend-color cleaning-color"></span>
-          <span>Schoonmaak taak</span>
+          <span>Schoonmaak</span>
         </div>
       </div>
     </div>
