@@ -557,7 +557,7 @@ app.put('/api/properties/:id', verifyToken, checkActiveUser, checkOwnerOrAdmin, 
 // Endpoint om alle boekingen van een property te wissen
 app.delete('/api/calendar/:propertyId/clear', verifyToken, checkActiveUser, checkOwnerOrAdmin, async (req, res) => {
   const { propertyId } = req.params;
-  const { platform } = req.query; // Optioneel: specifiek platform
+  const { platform } = req.query;
   
   try {
     let query = 'DELETE FROM "CalendarEvent" WHERE "propertyId" = $1';
@@ -568,11 +568,29 @@ app.delete('/api/calendar/:propertyId/clear', verifyToken, checkActiveUser, chec
       params.push(platform);
     }
     
+    // Eerst de te verwijderen IDs ophalen
+    const toDelete = await pool.query(
+      `SELECT id FROM "CalendarEvent" WHERE "propertyId" = $1 ${platform ? 'AND platform = $2' : ''}`,
+      params
+    );
+    
+    const idsToDelete = toDelete.rows.map(row => row.id);
+    
+    if (idsToDelete.length > 0) {
+      // Verwijder gekoppelde automatische schoonmaak taken
+      await pool.query(
+        `DELETE FROM "CleaningSchedule" 
+         WHERE "bookingId" = ANY($1::text[]) AND "createdBy" = 'system'`,
+        [idsToDelete]
+      );
+    }
+    
+    // Verwijder de boekingen
     const result = await pool.query(query, params);
     
     res.json({ 
       success: true, 
-      message: `${result.rowCount} boekingen verwijderd`,
+      message: `${result.rowCount} boekingen en bijbehorende schoonmaak verwijderd`,
       deletedCount: result.rowCount 
     });
   } catch (error) {
@@ -1146,12 +1164,11 @@ const syncCalendarEvents = async (propertyId, platform, icalUrl) => {
     
     let newCount = 0;
     let updatedCount = 0;
+    let cleaningCount = 0;
     
-    // Hardcoded waarden voor automatische schoonmaak
     const CLEANING_DELAY_HOURS = 1;
     const CLEANING_DURATION_HOURS = 5;
     
-    // Verzamel alle externe IDs uit de iCal
     const externalIdsFromICal = [];
     
     for (const eventId in events) {
@@ -1182,7 +1199,6 @@ const syncCalendarEvents = async (propertyId, platform, icalUrl) => {
       let bookingId;
       
       if (existing.rows.length === 0) {
-        // Nieuwe boeking toevoegen
         const result = await pool.query(
           `INSERT INTO "CalendarEvent" (id, "externalId", "propertyId", platform, "guestName", "guestEmail", "checkIn", "checkOut", status, "createdAt", "updatedAt")
            VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
@@ -1193,51 +1209,68 @@ const syncCalendarEvents = async (propertyId, platform, icalUrl) => {
         newCount++;
         console.log(`✅ Nieuwe ${platform} boeking: ${guestName} - check-out: ${checkOut.toLocaleString()}`);
       } else {
-        // Bestaande boeking updaten
+        bookingId = existing.rows[0].id;
         await pool.query(
           `UPDATE "CalendarEvent" 
            SET "guestName" = $1, "guestEmail" = $2, "checkIn" = $3, "checkOut" = $4, "updatedAt" = NOW()
            WHERE "externalId" = $5 AND platform = $6 AND "propertyId" = $7`,
           [guestName, guestEmail, checkIn, checkOut, externalId, platform, propertyId]
         );
-        bookingId = existing.rows[0].id;
         updatedCount++;
         console.log(`🔄 Geüpdatete ${platform} boeking: ${guestName} - check-out: ${checkOut.toLocaleString()}`);
       }
       
       // ALTIJD schoonmaak genereren voor deze boeking (als die nog niet bestaat)
-      await generateAutoCleaning(propertyId, checkOut, CLEANING_DELAY_HOURS, CLEANING_DURATION_HOURS);
+      const cleaningResult = await generateAutoCleaning(propertyId, checkOut, CLEANING_DELAY_HOURS, CLEANING_DURATION_HOURS, bookingId);
+      if (cleaningResult) {
+        cleaningCount++;
+      }
     }
     
-    // Verwijder boekingen die niet meer in de iCal voorkomen
     if (externalIdsFromICal.length > 0) {
-      const deleteResult = await pool.query(
-        `DELETE FROM "CalendarEvent" 
+      const toDelete = await pool.query(
+        `SELECT id FROM "CalendarEvent" 
          WHERE "propertyId" = $1 
          AND platform = $2 
          AND "externalId" != ALL($3::text[])`,
         [propertyId, platform, externalIdsFromICal]
       );
       
-      if (deleteResult.rowCount > 0) {
-        console.log(`🗑️ ${deleteResult.rowCount} ${platform} boekingen verwijderd (niet meer in iCal)`);
+      const idsToDelete = toDelete.rows.map(row => row.id);
+      
+      if (idsToDelete.length > 0) {
+        await pool.query(
+          `DELETE FROM "CleaningSchedule" 
+           WHERE "bookingId" = ANY($1::text[]) AND "createdBy" IS NULL`,
+          [idsToDelete]
+        );
+        
+        await pool.query(
+          `DELETE FROM "CalendarEvent" 
+           WHERE "propertyId" = $1 
+           AND platform = $2 
+           AND "externalId" != ALL($3::text[])`,
+          [propertyId, platform, externalIdsFromICal]
+        );
+        
+        console.log(`🗑️ ${idsToDelete.length} boekingen en bijbehorende schoonmaak verwijderd`);
       }
     }
     
-    broadcastUpdate('CALENDAR_SYNC', { propertyId, platform, newCount, updatedCount });
+    broadcastUpdate('CALENDAR_SYNC', { propertyId, platform, newCount, updatedCount, cleaningCount });
     
-    console.log(`📊 Sync voltooid voor ${platform}: ${newCount} nieuw, ${updatedCount} geüpdatet`);
-    return { success: true, newCount, updatedCount };
+    console.log(`📊 Sync voltooid voor ${platform}: ${newCount} nieuw, ${updatedCount} geüpdatet, ${cleaningCount} schoonmaak gegenereerd`);
+    return { success: true, newCount, updatedCount, cleaningCount };
   } catch (error) {
     console.error(`❌ Fout bij synchronisatie van ${platform}:`, error);
     return { success: false, error: error.message };
   }
 };
 
-const generateAutoCleaning = async (propertyId, checkOutDate, delayHours, cleaningHours) => {
+const generateAutoCleaning = async (propertyId, checkOutDate, delayHours, cleaningHours, bookingId) => {
   try {
-    if (!checkOutDate) {
-      console.error('❌ Geen check-out datum');
+    if (!checkOutDate || !bookingId) {
+      console.error('❌ Geen check-out datum of bookingId');
       return null;
     }
     
@@ -1253,15 +1286,14 @@ const generateAutoCleaning = async (propertyId, checkOutDate, delayHours, cleani
     const endDate = new Date(startDate);
     endDate.setHours(endDate.getHours() + cleaningHours);
     
-    // Check of er al een schoonmaak is voor deze periode
     const existingCleaning = await pool.query(
       `SELECT id FROM "CleaningSchedule" 
-       WHERE "propertyId" = $1 
-       AND "startDate" <= $2 AND "endDate" >= $3`,
-      [propertyId, endDate, startDate]
+       WHERE "propertyId" = $1 AND "bookingId" = $2`,
+      [propertyId, bookingId]
     );
     
     if (existingCleaning.rows.length > 0) {
+      console.log(`⚠️ Schoonmaak bestaat al voor boeking ${bookingId}`);
       return null;
     }
     
@@ -1270,13 +1302,13 @@ const generateAutoCleaning = async (propertyId, checkOutDate, delayHours, cleani
     
     const result = await pool.query(
       `INSERT INTO "CleaningSchedule" 
-       (id, "propertyId", title, description, "startDate", "endDate", "createdBy", status, "createdAt", "updatedAt")
-       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+       (id, "propertyId", "bookingId", title, description, "startDate", "endDate", "createdBy", status, "createdAt", "updatedAt")
+       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
        RETURNING *`,
-      [propertyId, title, `Automatisch gegenereerd (start ${delayHours} uur na check-out, duur ${cleaningHours} uur)`, startDate, endDate, 'system', 'PENDING']
+      [propertyId, bookingId, title, `Automatisch gegenereerd (start ${delayHours} uur na check-out, duur ${cleaningHours} uur)`, startDate, endDate, null, 'PENDING']
     );
     
-    console.log(`🧹 Automatische schoonmaak gegenereerd: ${startDate.toLocaleString()} - ${endDate.toLocaleString()}`);
+    console.log(`🧹 Automatische schoonmaak gegenereerd voor boeking ${bookingId}: ${startDate.toLocaleString()} - ${endDate.toLocaleString()}`);
     broadcastUpdate('CLEANING_SCHEDULE_CREATED', result.rows[0]);
     return result.rows[0];
     
@@ -1285,57 +1317,6 @@ const generateAutoCleaning = async (propertyId, checkOutDate, delayHours, cleani
     return null;
   }
 };
-
-// Endpoint om schoonmaak te genereren voor alle bestaande boekingen
-app.post('/api/generate-missing-cleaning/:propertyId', verifyToken, checkActiveUser, checkOwnerOrAdmin, async (req, res) => {
-  const { propertyId } = req.params;
-  
-  try {
-    const CLEANING_DELAY_HOURS = 1;
-    const CLEANING_DURATION_HOURS = 5;
-    
-    // Haal alle actieve boekingen op
-    const bookings = await pool.query(
-      `SELECT * FROM "CalendarEvent" 
-       WHERE "propertyId" = $1 AND status = 'ACTIVE'
-       ORDER BY "checkOut" ASC`,
-      [propertyId]
-    );
-    
-    console.log(`📋 ${bookings.rows.length} boekingen gevonden voor property ${propertyId}`);
-    
-    let generatedCount = 0;
-    let skippedCount = 0;
-    
-    for (const booking of bookings.rows) {
-      console.log(`🔍 Verwerken boeking: ${booking.guestName} - check-out: ${new Date(booking.checkOut).toLocaleString()}`);
-      
-      const result = await generateAutoCleaning(
-        propertyId, 
-        booking.checkOut, 
-        CLEANING_DELAY_HOURS, 
-        CLEANING_DURATION_HOURS
-      );
-      
-      if (result) {
-        generatedCount++;
-      } else {
-        skippedCount++;
-      }
-    }
-    
-    res.json({ 
-      success: true, 
-      totalBookings: bookings.rows.length,
-      generated: generatedCount,
-      skipped: skippedCount,
-      message: `${generatedCount} schoonmaak taken gegenereerd, ${skippedCount} overgeslagen (bestaand of verleden)`
-    });
-  } catch (error) {
-    console.error('Fout bij genereren schoonmaak:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
 
 const syncAllProperties = async () => {
   try {

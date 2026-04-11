@@ -10,17 +10,12 @@ model User {
   id              String   @id @default(cuid())
   email           String   @unique
   name            String?
-  role            String   // "ADMIN", "VERHUURDER", "SCHOONMAKER"
+  role            String
   password        String?
   isActive        Boolean  @default(false)
   activationToken String?
-  personalCode    String?  // 6-cijferige code voor schoonmaker
+  personalCode    String?
   createdAt       DateTime @default(now())
-  
-  properties       Property[]
-  personalCodes    PersonalCode[]
-  cleaningSchedules CleaningSchedule[] @relation("CreatedSchedules")
-  assignedCleaningSchedules CleaningSchedule[] @relation("AssignedSchedules")
 }
 
 model Property {
@@ -28,14 +23,10 @@ model Property {
   name           String
   address        String?
   ownerId        String
-  owner          User     @relation(fields: [ownerId], references: [id])
   airbnbIcalUrl  String?
   bookingIcalUrl String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
-  
-  calendarEvents   CalendarEvent[]
-  cleaningSchedules CleaningSchedule[]
 }
 
 model PersonalCode {
@@ -44,15 +35,13 @@ model PersonalCode {
   code      String
   userId    String
   createdAt DateTime @default(now())
-  
-  user User @relation(fields: [userId], references: [id])
 }
 
 model CalendarEvent {
   id          String   @id @default(cuid())
   externalId  String
   propertyId  String
-  platform    String   // "AIRBNB", "BOOKING", "MANUAL"
+  platform    String
   guestName   String?
   guestEmail  String?
   checkIn     DateTime
@@ -60,9 +49,7 @@ model CalendarEvent {
   status      String   @default("ACTIVE")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
-  property Property @relation(fields: [propertyId], references: [id])
-  
+
   @@unique([propertyId, externalId, platform])
   @@index([propertyId])
   @@index([checkIn, checkOut])
@@ -71,36 +58,32 @@ model CalendarEvent {
 model CleaningSchedule {
   id          String   @id @default(cuid())
   propertyId  String
-  property    Property @relation(fields: [propertyId], references: [id])
+  bookingId   String?
   title       String
   description String?
   startDate   DateTime
   endDate     DateTime
   cleanerId   String?
-  cleaner     User?    @relation("AssignedSchedules", fields: [cleanerId], references: [id])
-  createdBy   String
-  creator     User     @relation("CreatedSchedules", fields: [createdBy], references: [id])
+  createdBy   String?
   status      String   @default("PENDING")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
-  history     CleaningScheduleHistory[]
-  
+
   @@index([propertyId])
   @@index([startDate, endDate])
   @@index([cleanerId])
   @@index([status])
+  @@index([bookingId])
 }
 
 model CleaningScheduleHistory {
   id              String   @id @default(cuid())
   cleaningScheduleId String
-  cleaningSchedule   CleaningSchedule @relation(fields: [cleaningScheduleId], references: [id])
   action          String
-  changedBy       String
+  changedBy       String?
   oldValue        Json?
   newValue        Json?
   createdAt       DateTime @default(now())
-  
+
   @@index([cleaningScheduleId])
 }
