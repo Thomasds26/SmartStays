@@ -80,7 +80,7 @@ model CleaningSchedule {
   cleaner     User?    @relation("AssignedSchedules", fields: [cleanerId], references: [id])
   createdBy   String
   creator     User     @relation("CreatedSchedules", fields: [createdBy], references: [id])
-  status      String   @default("PENDING") // PENDING, ASSIGNED, IN_PROGRESS, COMPLETED, CANCELLED
+  status      String   @default("PENDING")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
@@ -96,7 +96,7 @@ model CleaningScheduleHistory {
   id              String   @id @default(cuid())
   cleaningScheduleId String
   cleaningSchedule   CleaningSchedule @relation(fields: [cleaningScheduleId], references: [id])
-  action          String   // CREATED, UPDATED, ASSIGNED, COMPLETED, CANCELLED
+  action          String
   changedBy       String
   oldValue        Json?
   newValue        Json?

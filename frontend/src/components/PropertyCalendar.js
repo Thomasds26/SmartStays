@@ -10,7 +10,9 @@ import API_URL from '../config';
 import './PropertyCalendar.css';
 
 moment.locale('nl', {
-  week: { dow: 1 },
+  week: {
+    dow: 0,  // Zondag als eerste dag van de week
+  },
   months: 'januari_februari_maart_april_mei_juni_juli_augustus_september_oktober_november_december'.split('_'),
   monthsShort: 'jan_feb_maa_apr_mei_jun_jul_aug_sep_okt_nov_dec'.split('_'),
   weekdays: 'zondag_maandag_dinsdag_woensdag_donderdag_vrijdag_zaterdag'.split('_'),
@@ -62,51 +64,59 @@ function PropertyCalendar({ propertyId, propertyName, userRole }) {
     cleanerId: ''
   });
 
-  const fetchCalendarData = useCallback(async () => {
-    if (!propertyId) return;
+const fetchCalendarData = useCallback(async () => {
+  if (!propertyId) return;
+  
+  try {
+    const token = localStorage.getItem('token');
+    const response = await axios.get(`${API_URL}/api/calendar/${propertyId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
     
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/api/calendar/${propertyId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      const formattedEvents = response.data.map(item => {
-        if (item.type === 'booking') {
-          return {
-            id: item.id,
-            title: `${item.guestName || 'Gast'} - ${item.platform}`,
-            start: new Date(item.checkIn),
-            end: new Date(item.checkOut),
-            type: 'booking',
-            backgroundColor: '#1e88e5',
-            borderColor: '#1e88e5',
-            textColor: 'white'
-          };
-        } else {
-          return {
-            id: item.id,
-            title: `🧹 ${item.title}`,
-            description: item.description,
-            start: new Date(item.startDate),
-            end: new Date(item.endDate),
-            type: 'cleaning',
-            backgroundColor: '#4caf50',
-            borderColor: '#4caf50',
-            textColor: 'white',
-            cleanerName: item.cleaner_name,
-            status: item.status
-          };
-        }
-      });
-      
-      setEvents(formattedEvents);
-      setLoading(false);
-    } catch (error) {
-      console.error('Fout bij ophalen kalender:', error);
-      setLoading(false);
-    }
-  }, [propertyId]);
+    const formattedEvents = response.data.map(item => {
+      if (item.type === 'booking') {
+        // Originele check-out datum voor tekst
+        const originalCheckOut = new Date(item.checkOut);
+        
+        // Einddatum voor visuele weergave (+1 dag)
+        const visualEndDate = new Date(item.checkOut);
+        visualEndDate.setDate(visualEndDate.getDate() + 1);
+        
+        return {
+          id: item.id,
+          title: `${item.guestName || 'Gast'} - ${item.platform}`,
+          start: new Date(item.checkIn),
+          end: visualEndDate,  // Voor de kalender visualisatie
+          originalCheckOut: originalCheckOut,  // Originele datum voor tekst
+          type: 'booking',
+          backgroundColor: '#1e88e5',
+          borderColor: '#1e88e5',
+          textColor: 'white'
+        };
+      } else {
+        return {
+          id: item.id,
+          title: item.title,
+          description: item.description,
+          start: new Date(item.startDate),
+          end: new Date(item.endDate),
+          type: 'cleaning',
+          backgroundColor: '#4caf50',
+          borderColor: '#4caf50',
+          textColor: 'white',
+          cleanerName: item.cleaner_name,
+          status: item.status
+        };
+      }
+    });
+    
+    setEvents(formattedEvents);
+    setLoading(false);
+  } catch (error) {
+    console.error('Fout bij ophalen kalender:', error);
+    setLoading(false);
+  }
+}, [propertyId]);
 
   const fetchCleaners = async () => {
     if (userRole !== 'ADMIN') return;
@@ -218,20 +228,13 @@ function PropertyCalendar({ propertyId, propertyName, userRole }) {
 
   const handleSelectEvent = (event) => {
     if (event.type === 'booking') {
-      alert(`Boeking: ${event.title}\nVan: ${moment(event.start).format('DD-MM-YYYY HH:mm')}\nTot: ${moment(event.end).format('DD-MM-YYYY HH:mm')}`);
+      // Gebruik originalCheckOut als die bestaat, anders event.end
+      const endDate = event.originalCheckOut || event.end;
+      alert(`Boeking: ${event.title}\nVan: ${moment(event.start).format('DD-MM-YYYY HH:mm')}\nTot: ${moment(endDate).format('DD-MM-YYYY HH:mm')}`);
     } else {
-      const schedule = events.find(e => e.id === event.id);
-      if (schedule) {
-        setFormData({
-          title: schedule.title.replace('🧹 ', ''),
-          description: schedule.description || '',
-          startDate: schedule.start,
-          endDate: schedule.end,
-          cleanerId: ''
-        });
-        setEditingSchedule({ id: schedule.id });
-        setShowCleaningModal(true);
-      }
+      const startStr = moment(event.start).format('DD-MM-YYYY HH:mm');
+      const endStr = moment(event.end).format('DD-MM-YYYY HH:mm');
+      alert(`Schoonmaak taak: ${event.title}\nPeriode: ${startStr} - ${endStr}`);
     }
   };
 
@@ -304,7 +307,13 @@ function PropertyCalendar({ propertyId, propertyName, userRole }) {
         onView={setCurrentView}
         components={{ toolbar: CustomToolbar }}
         popup
-        tooltipAccessor={(event) => event.title}
+        tooltipAccessor={(event) => {
+          if (event.type === 'booking') {
+            const endDate = event.originalCheckOut || event.end;
+            return `${event.title}\n${moment(event.start).format('DD-MM-YYYY')} - ${moment(endDate).format('DD-MM-YYYY')}`;
+          }
+          return event.title;
+        }}
       />
       
       <div className="calendar-legend">

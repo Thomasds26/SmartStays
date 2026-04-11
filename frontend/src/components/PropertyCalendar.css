@@ -336,3 +336,34 @@
     font-size: 9px;
   }
 }
+
+/* Fix voor zondagen die niet blauw worden */
+.rbc-month-view .rbc-date-cell {
+  z-index: 1;
+}
+
+.rbc-event {
+  z-index: 2;
+  position: relative;
+}
+
+/* Zorg dat events over de hele dag zichtbaar zijn */
+.rbc-event.rbc-selected {
+  z-index: 3;
+}
+
+/* Forceer events om correct weer te geven op zondag */
+.rbc-row-bg .rbc-day-bg:first-child {
+  background-color: transparent;
+}
+
+/* Zorg dat de event container correct toont op alle dagen */
+.rbc-event-content {
+  overflow: visible;
+}
+
+/* Debug: toon randjes om dagen te zien */
+.rbc-day-bg {
+  outline: 1px solid #f0f0f0;
+}
+
