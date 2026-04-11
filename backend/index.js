@@ -316,8 +316,8 @@ app.delete('/api/users/:id', verifyToken, checkActiveUser, checkAdmin, async (re
     
     await pool.query('DELETE FROM "Property" WHERE "ownerId" = $1', [userIdToDelete]);
     await pool.query('DELETE FROM "PersonalCode" WHERE "userId" = $1', [userIdToDelete]);
-    await pool.query('DELETE FROM "CleaningTask" WHERE "cleanerId" = $1', [userIdToDelete]);
-    await pool.query('DELETE FROM "CleaningReserve" WHERE "cleanerId" = $1', [userIdToDelete]);
+    await pool.query('DELETE FROM "CleaningSchedule" WHERE "cleanerId" = $1', [userIdToDelete]);
+    await pool.query('DELETE FROM "CleaningScheduleHistory" WHERE "changedBy" = $1', [userIdToDelete]);
     await pool.query('DELETE FROM "User" WHERE id = $1', [userIdToDelete]);
     
     res.json({ success: true, message: 'Gebruiker en bijbehorende gegevens verwijderd' });
@@ -331,8 +331,6 @@ app.get('/api/admin/properties', verifyToken, checkActiveUser, checkAdmin, async
   try {
     const result = await pool.query(`
       SELECT p.id, p.name, p.address, p."ownerId", 
-             p."cleaningDuration",
-             p."daysBetween",
              p."airbnbIcalUrl",
              p."bookingIcalUrl",
              u.email as owner_email, u.name as owner_name,
@@ -349,7 +347,7 @@ app.get('/api/admin/properties', verifyToken, checkActiveUser, checkAdmin, async
 });
 
 app.post('/api/admin/properties', verifyToken, checkActiveUser, checkAdmin, async (req, res) => {
-  const { name, address, ownerId, cleaningDuration, daysBetween, airbnbIcalUrl, bookingIcalUrl } = req.body;
+  const { name, address, ownerId, airbnbIcalUrl, bookingIcalUrl } = req.body;
   
   if (!name || !ownerId) {
     return res.status(400).json({ error: 'Naam en verhuurder zijn verplicht' });
@@ -366,10 +364,10 @@ app.post('/api/admin/properties', verifyToken, checkActiveUser, checkAdmin, asyn
     }
     
     const result = await pool.query(
-      `INSERT INTO "Property" (id, name, address, "ownerId", "cleaningDuration", "daysBetween", "airbnbIcalUrl", "bookingIcalUrl", "createdAt") 
-       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, NOW()) 
-       RETURNING id, name, address, "ownerId", "cleaningDuration", "daysBetween", "airbnbIcalUrl", "bookingIcalUrl"`,
-      [name, address || null, ownerId, cleaningDuration || 90, daysBetween || 1, airbnbIcalUrl || null, bookingIcalUrl || null]
+      `INSERT INTO "Property" (id, name, address, "ownerId", "airbnbIcalUrl", "bookingIcalUrl", "createdAt") 
+       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, NOW()) 
+       RETURNING id, name, address, "ownerId", "airbnbIcalUrl", "bookingIcalUrl"`,
+      [name, address || null, ownerId, airbnbIcalUrl || null, bookingIcalUrl || null]
     );
     
     if (airbnbIcalUrl) {
@@ -388,7 +386,7 @@ app.post('/api/admin/properties', verifyToken, checkActiveUser, checkAdmin, asyn
 
 app.put('/api/admin/properties/:id', verifyToken, checkActiveUser, checkAdmin, async (req, res) => {
   const propertyId = req.params.id;
-  const { name, address, ownerId, cleaningDuration, daysBetween, airbnbIcalUrl, bookingIcalUrl } = req.body;
+  const { name, address, ownerId, airbnbIcalUrl, bookingIcalUrl } = req.body;
   
   try {
     const propertyExists = await pool.query(
@@ -415,14 +413,6 @@ app.put('/api/admin/properties/:id', verifyToken, checkActiveUser, checkAdmin, a
     if (ownerId !== undefined) {
       updates.push(`"ownerId" = $${paramIndex++}`);
       values.push(ownerId);
-    }
-    if (cleaningDuration !== undefined) {
-      updates.push(`"cleaningDuration" = $${paramIndex++}`);
-      values.push(cleaningDuration);
-    }
-    if (daysBetween !== undefined) {
-      updates.push(`"daysBetween" = $${paramIndex++}`);
-      values.push(daysBetween);
     }
     if (airbnbIcalUrl !== undefined) {
       updates.push(`"airbnbIcalUrl" = $${paramIndex++}`);
@@ -462,9 +452,7 @@ app.delete('/api/admin/properties/:id', verifyToken, checkActiveUser, checkAdmin
   const propertyId = req.params.id;
   
   try {
-    await pool.query('DELETE FROM "Booking" WHERE "propertyId" = $1', [propertyId]);
-    await pool.query('DELETE FROM "CleaningTask" WHERE "propertyId" = $1', [propertyId]);
-    await pool.query('DELETE FROM "Integration" WHERE "propertyId" = $1', [propertyId]);
+    await pool.query('DELETE FROM "CleaningSchedule" WHERE "propertyId" = $1', [propertyId]);
     await pool.query('DELETE FROM "CalendarEvent" WHERE "propertyId" = $1', [propertyId]);
     await pool.query('DELETE FROM "Property" WHERE id = $1', [propertyId]);
     res.json({ success: true, message: 'Property verwijderd' });
@@ -478,7 +466,7 @@ app.delete('/api/admin/properties/:id', verifyToken, checkActiveUser, checkAdmin
 app.get('/api/properties', verifyToken, checkActiveUser, checkOwnerOrAdmin, async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, name, address, "createdAt", "daysBetween", "airbnbIcalUrl", "bookingIcalUrl" FROM "Property" WHERE "ownerId" = $1 ORDER BY "createdAt" DESC',
+      'SELECT id, name, address, "createdAt", "airbnbIcalUrl", "bookingIcalUrl" FROM "Property" WHERE "ownerId" = $1 ORDER BY "createdAt" DESC',
       [req.userId]
     );
     res.json(result.rows);
@@ -490,7 +478,7 @@ app.get('/api/properties', verifyToken, checkActiveUser, checkOwnerOrAdmin, asyn
 
 app.put('/api/properties/:id', verifyToken, checkActiveUser, checkOwnerOrAdmin, async (req, res) => {
   const propertyId = req.params.id;
-  const { name, address, daysBetween, airbnbIcalUrl, bookingIcalUrl } = req.body;
+  const { name, address, airbnbIcalUrl, bookingIcalUrl } = req.body;
   
   if (!name) {
     return res.status(400).json({ error: 'Naam is verplicht' });
@@ -498,7 +486,7 @@ app.put('/api/properties/:id', verifyToken, checkActiveUser, checkOwnerOrAdmin, 
   
   try {
     const propertyCheck = await pool.query(
-      'SELECT id FROM "Property" WHERE id = $1 AND "ownerId" = $2',
+      'SELECT id, "airbnbIcalUrl", "bookingIcalUrl" FROM "Property" WHERE id = $1 AND "ownerId" = $2',
       [propertyId, req.userId]
     );
     
@@ -518,11 +506,6 @@ app.put('/api/properties/:id', verifyToken, checkActiveUser, checkOwnerOrAdmin, 
       values.push(address);
     }
     
-    if (daysBetween !== undefined) {
-      updates.push(`"daysBetween" = $${paramIndex++}`);
-      values.push(daysBetween);
-    }
-    
     if (airbnbIcalUrl !== undefined) {
       updates.push(`"airbnbIcalUrl" = $${paramIndex++}`);
       values.push(airbnbIcalUrl || null);
@@ -536,21 +519,175 @@ app.put('/api/properties/:id', verifyToken, checkActiveUser, checkOwnerOrAdmin, 
     values.push(propertyId);
     
     const result = await pool.query(
-      `UPDATE "Property" SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING id, name, address, "daysBetween", "airbnbIcalUrl", "bookingIcalUrl"`,
+      `UPDATE "Property" SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING id, name, address, "airbnbIcalUrl", "bookingIcalUrl"`,
       values
     );
     
-    if (airbnbIcalUrl !== undefined && airbnbIcalUrl && airbnbIcalUrl !== '') {
+    // Verwijder en synchroniseer Airbnb
+    if (airbnbIcalUrl && airbnbIcalUrl.trim() !== '') {
       await syncCalendarEvents(propertyId, 'AIRBNB', airbnbIcalUrl);
+    } else {
+      // Verwijder alle Airbnb boekingen
+      const deleteResult = await pool.query(
+        'DELETE FROM "CalendarEvent" WHERE "propertyId" = $1 AND platform = $2',
+        [propertyId, 'AIRBNB']
+      );
+      console.log(`🗑️ ${deleteResult.rowCount} Airbnb boekingen verwijderd (URL verwijderd)`);
     }
-    if (bookingIcalUrl !== undefined && bookingIcalUrl && bookingIcalUrl !== '') {
+    
+    // Verwijder en synchroniseer Booking.com
+    if (bookingIcalUrl && bookingIcalUrl.trim() !== '') {
       await syncCalendarEvents(propertyId, 'BOOKING', bookingIcalUrl);
+    } else {
+      // Verwijder alle Booking.com boekingen
+      const deleteResult = await pool.query(
+        'DELETE FROM "CalendarEvent" WHERE "propertyId" = $1 AND platform = $2',
+        [propertyId, 'BOOKING']
+      );
+      console.log(`🗑️ ${deleteResult.rowCount} Booking.com boekingen verwijderd (URL verwijderd)`);
     }
     
     res.json({ success: true, property: result.rows[0] });
   } catch (error) {
     console.error('Fout bij updaten property:', error);
     res.status(500).json({ error: 'Property kon niet worden bijgewerkt' });
+  }
+});
+
+// Endpoint om alle boekingen van een property te wissen
+app.delete('/api/calendar/:propertyId/clear', verifyToken, checkActiveUser, checkOwnerOrAdmin, async (req, res) => {
+  const { propertyId } = req.params;
+  const { platform } = req.query; // Optioneel: specifiek platform
+  
+  try {
+    let query = 'DELETE FROM "CalendarEvent" WHERE "propertyId" = $1';
+    const params = [propertyId];
+    
+    if (platform) {
+      query += ' AND platform = $2';
+      params.push(platform);
+    }
+    
+    const result = await pool.query(query, params);
+    
+    res.json({ 
+      success: true, 
+      message: `${result.rowCount} boekingen verwijderd`,
+      deletedCount: result.rowCount 
+    });
+  } catch (error) {
+    console.error('Fout bij wissen boekingen:', error);
+    res.status(500).json({ error: 'Kon boekingen niet wissen' });
+  }
+});
+
+// Endpoint om schoonmaak te genereren voor alle bestaande boekingen
+app.post('/api/generate-cleaning-for-existing-bookings/:propertyId', verifyToken, checkActiveUser, checkOwnerOrAdmin, async (req, res) => {
+  const propertyId = req.params.id;
+  
+  try {
+    // Haal alle actieve boekingen op
+    const bookings = await pool.query(
+      `SELECT * FROM "CalendarEvent" 
+       WHERE "propertyId" = $1 AND status = 'ACTIVE'`,
+      [propertyId]
+    );
+    
+    const CLEANING_DELAY_HOURS = 1;
+    const CLEANING_DURATION_HOURS = 5;
+    
+    let generatedCount = 0;
+    
+    for (const booking of bookings.rows) {
+      const result = await generateAutoCleaning(
+        propertyId, 
+        booking.checkOut, 
+        CLEANING_DELAY_HOURS, 
+        CLEANING_DURATION_HOURS
+      );
+      if (result) generatedCount++;
+    }
+    
+    res.json({ 
+      success: true, 
+      message: `${generatedCount} van de ${bookings.rows.length} schoonmaak taken gegenereerd`,
+      totalBookings: bookings.rows.length,
+      generated: generatedCount
+    });
+  } catch (error) {
+    console.error('Fout bij genereren schoonmaak:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Endpoint om auto-cleaning instellingen te updaten
+app.put('/api/properties/:id/cleaning-settings', verifyToken, checkActiveUser, checkOwnerOrAdmin, async (req, res) => {
+  const propertyId = req.params.id;
+  const { autoCleaning, cleaningHours, cleaningDelayHours } = req.body;
+  
+  try {
+    const propertyCheck = await pool.query(
+      'SELECT id FROM "Property" WHERE id = $1 AND "ownerId" = $2',
+      [propertyId, req.userId]
+    );
+    
+    if (propertyCheck.rows.length === 0 && req.userRole !== 'ADMIN') {
+      return res.status(403).json({ error: 'Geen toegang tot deze property' });
+    }
+    
+    const updates = [];
+    const values = [];
+    let paramIndex = 1;
+    
+    if (autoCleaning !== undefined) {
+      updates.push(`"autoCleaning" = $${paramIndex++}`);
+      values.push(autoCleaning);
+    }
+    if (cleaningHours !== undefined) {
+      updates.push(`"cleaningHours" = $${paramIndex++}`);
+      values.push(cleaningHours);
+    }
+    if (cleaningDelayHours !== undefined) {
+      updates.push(`"cleaningDelayHours" = $${paramIndex++}`);
+      values.push(cleaningDelayHours);
+    }
+    
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'Geen instellingen om te updaten' });
+    }
+    
+    values.push(propertyId);
+    
+    const result = await pool.query(
+      `UPDATE "Property" SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING id, name, "autoCleaning", "cleaningHours", "cleaningDelayHours"`,
+      values
+    );
+    
+    res.json({ success: true, settings: result.rows[0] });
+  } catch (error) {
+    console.error('Fout bij updaten cleaning settings:', error);
+    res.status(500).json({ error: 'Instellingen konden niet worden bijgewerkt' });
+  }
+});
+
+// Endpoint om auto-cleaning instellingen op te halen
+app.get('/api/properties/:id/cleaning-settings', verifyToken, checkActiveUser, async (req, res) => {
+  const propertyId = req.params.id;
+  
+  try {
+    const result = await pool.query(
+      'SELECT "autoCleaning", "cleaningHours", "cleaningDelayHours" FROM "Property" WHERE id = $1',
+      [propertyId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Property niet gevonden' });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Fout bij ophalen cleaning settings:', error);
+    res.status(500).json({ error: 'Kon instellingen niet ophalen' });
   }
 });
 
@@ -677,382 +814,590 @@ app.delete('/api/personal-codes/:id', verifyToken, checkActiveUser, checkOwnerOr
   }
 });
 
-// ============ SCHOONMAKER ENDPOINTS ============
-app.get('/api/cleaning-tasks', verifyToken, checkActiveUser, async (req, res) => {
+// ============ SCHOONMAAK PLANNING ENDPOINTS ============
+
+// Haal alle schoonmaak planningen op
+app.get('/api/cleaning-schedules', verifyToken, checkActiveUser, async (req, res) => {
   try {
-    const { status, withDetails } = req.query;
+    const { propertyId, startDate, endDate, status } = req.query;
+    
     let query = `
-      SELECT ct.*, 
-             p.name as property_name, 
-             p.address,
+      SELECT cs.*, 
+             p.name as property_name,
              u.name as cleaner_name,
-             u2.name as owner_name,
-             (SELECT COUNT(*) FROM "CleaningReserve" cr WHERE cr."taskId" = ct.id) as reserve_count
-      FROM "CleaningTask" ct
-      LEFT JOIN "Property" p ON ct."propertyId" = p.id
-      LEFT JOIN "User" u ON ct."cleanerId" = u.id
-      LEFT JOIN "User" u2 ON p."ownerId" = u2.id
+             u.email as cleaner_email,
+             creator.name as created_by_name
+      FROM "CleaningSchedule" cs
+      LEFT JOIN "Property" p ON cs."propertyId" = p.id
+      LEFT JOIN "User" u ON cs."cleanerId" = u.id
+      LEFT JOIN "User" creator ON cs."createdBy" = creator.id
       WHERE 1=1
     `;
+    
     const params = [];
+    let paramIndex = 1;
+    
+    if (req.userRole === 'VERHUURDER') {
+      query += ` AND p."ownerId" = $${paramIndex++}`;
+      params.push(req.userId);
+    }
+    
+    if (propertyId) {
+      query += ` AND cs."propertyId" = $${paramIndex++}`;
+      params.push(propertyId);
+    }
+    
+    if (startDate) {
+      query += ` AND cs."startDate" >= $${paramIndex++}`;
+      params.push(startDate);
+    }
+    
+    if (endDate) {
+      query += ` AND cs."endDate" <= $${paramIndex++}`;
+      params.push(endDate);
+    }
     
     if (status) {
-      query += ` AND ct.status = $${params.length + 1}`;
+      query += ` AND cs.status = $${paramIndex++}`;
       params.push(status);
     }
     
-    query += ` ORDER BY ct."scheduledAt" ASC`;
+    query += ` ORDER BY cs."startDate" ASC`;
     
     const result = await pool.query(query, params);
-    
-    // Haal reserves op voor elke taak
-    const tasksWithReserves = [];
-    for (const task of result.rows) {
-      const reservesResult = await pool.query(
-        `SELECT cr.id, cr.position, u.name as cleaner_name
-         FROM "CleaningReserve" cr
-         LEFT JOIN "User" u ON cr."cleanerId" = u.id
-         WHERE cr."taskId" = $1
-         ORDER BY cr.position ASC`,
-        [task.id]
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Fout bij ophalen schoonmaak planningen:', error);
+    res.status(500).json({ error: 'Kon planningen niet ophalen' });
+  }
+});
+
+// Nieuwe schoonmaak planning toevoegen
+app.post('/api/cleaning-schedules', verifyToken, checkActiveUser, checkOwnerOrAdmin, async (req, res) => {
+  const { propertyId, title, description, startDate, endDate, cleanerId } = req.body;
+  
+  if (!propertyId || !title || !startDate || !endDate) {
+    return res.status(400).json({ error: 'Property, titel, start en eind datum zijn verplicht' });
+  }
+  
+  try {
+    if (req.userRole === 'VERHUURDER') {
+      const propertyCheck = await pool.query(
+        'SELECT id FROM "Property" WHERE id = $1 AND "ownerId" = $2',
+        [propertyId, req.userId]
       );
       
-      tasksWithReserves.push({
-        ...task,
-        reserves: reservesResult.rows
-      });
-    }
-    
-    // Als withDetails=true, haal ook boekingsgegevens op
-    if (withDetails === 'true') {
-      const tasksWithBookings = [];
-      for (const task of tasksWithReserves) {
-        const bookingResult = await pool.query(
-          `SELECT ce."guestName", ce."guestEmail", ce."checkIn", ce."checkOut"
-           FROM "CalendarEvent" ce
-           WHERE ce."propertyId" = $1 
-           AND ce.status = 'ACTIVE'
-           ORDER BY ce."checkIn" ASC`,
-          [task.propertyId]
-        );
-        
-        let closestBooking = null;
-        if (bookingResult.rows.length > 0) {
-          const taskDate = new Date(task.scheduledAt);
-          let minDiff = Infinity;
-          for (const booking of bookingResult.rows) {
-            const checkOut = new Date(booking.checkOut);
-            const diff = Math.abs(checkOut - taskDate);
-            if (diff < minDiff) {
-              minDiff = diff;
-              closestBooking = booking;
-            }
-          }
-        }
-        
-        tasksWithBookings.push({
-          ...task,
-          guest_name: closestBooking?.guestName || null,
-          guest_email: closestBooking?.guestEmail || null,
-          booking_check_in: closestBooking?.checkIn || null,
-          booking_check_out: closestBooking?.checkOut || null
-        });
+      if (propertyCheck.rows.length === 0) {
+        return res.status(403).json({ error: 'Geen toegang tot deze property' });
       }
-      res.json(tasksWithBookings);
-    } else {
-      res.json(tasksWithReserves);
-    }
-  } catch (error) {
-    console.error('Fout bij ophalen taken:', error);
-    res.status(500).json({ error: 'Kon taken niet ophalen' });
-  }
-});
-
-app.post('/api/cleaning-tasks/:id/assign', verifyToken, checkActiveUser, async (req, res) => {
-  const taskId = req.params.id;
-  const cleanerId = req.userId;
-  
-  try {
-    const taskCheck = await pool.query(
-      'SELECT status FROM "CleaningTask" WHERE id = $1',
-      [taskId]
-    );
-    
-    if (taskCheck.rows.length === 0) {
-      return res.status(404).json({ error: 'Taak niet gevonden' });
     }
     
-    if (taskCheck.rows[0].status !== 'OPEN') {
-      return res.status(400).json({ error: 'Deze taak is al toegewezen' });
+    const startDateTime = new Date(startDate);
+    const endDateTime = new Date(endDate);
+    
+    if (startDateTime >= endDateTime) {
+      return res.status(400).json({ error: 'Einddatum moet na startdatum zijn' });
     }
     
     const result = await pool.query(
-      'UPDATE "CleaningTask" SET status = $1, "cleanerId" = $2 WHERE id = $3 RETURNING *',
-      ['ASSIGNED', cleanerId, taskId]
+      `INSERT INTO "CleaningSchedule" (id, "propertyId", title, description, "startDate", "endDate", "cleanerId", "createdBy", status, "createdAt", "updatedAt")
+       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+       RETURNING *`,
+      [propertyId, title, description || null, startDateTime, endDateTime, cleanerId || null, req.userId, 'PENDING']
     );
     
-    await pool.query('DELETE FROM "CleaningReserve" WHERE "taskId" = $1 AND "cleanerId" = $2', [taskId, cleanerId]);
-    
-    res.json({ success: true, task: result.rows[0] });
-  } catch (error) {
-    console.error('Fout bij toewijzen taak:', error);
-    res.status(500).json({ error: 'Kon taak niet toewijzen' });
-  }
-});
-
-app.post('/api/cleaning-tasks/:id/reserve', verifyToken, checkActiveUser, async (req, res) => {
-  const taskId = req.params.id;
-  const cleanerId = req.userId;
-  
-  try {
-    const taskCheck = await pool.query(
-      'SELECT status FROM "CleaningTask" WHERE id = $1',
-      [taskId]
-    );
-    
-    if (taskCheck.rows.length === 0) {
-      return res.status(404).json({ error: 'Taak niet gevonden' });
-    }
-    
-    if (taskCheck.rows[0].status !== 'OPEN') {
-      return res.status(400).json({ error: 'Deze taak is al toegewezen, je kunt niet meer reserveren' });
-    }
-    
-    const reserveCount = await pool.query(
-      'SELECT COUNT(*) FROM "CleaningReserve" WHERE "taskId" = $1',
-      [taskId]
-    );
-    
-    const currentCount = parseInt(reserveCount.rows[0].count);
-    if (currentCount >= 3) {
-      return res.status(400).json({ error: 'Maximaal 3 reserves toegestaan voor deze taak' });
-    }
-    
-    const existingReserve = await pool.query(
-      'SELECT id FROM "CleaningReserve" WHERE "taskId" = $1 AND "cleanerId" = $2',
-      [taskId, cleanerId]
-    );
-    
-    if (existingReserve.rows.length > 0) {
-      return res.status(400).json({ error: 'Je staat al op de reservelijst voor deze taak' });
-    }
-    
-    const newPosition = currentCount + 1;
-    
-    const result = await pool.query(
-      'INSERT INTO "CleaningReserve" (id, "taskId", "cleanerId", position, status, "createdAt") VALUES (gen_random_uuid()::text, $1, $2, $3, $4, NOW()) RETURNING *',
-      [taskId, cleanerId, newPosition, 'PENDING']
-    );
-    
-    res.json({ success: true, reserve: result.rows[0] });
-  } catch (error) {
-    console.error('Fout bij reserveren:', error);
-    res.status(500).json({ error: 'Kon niet reserveren' });
-  }
-});
-
-app.post('/api/cleaning-tasks/:id/cancel-assignment', verifyToken, checkActiveUser, async (req, res) => {
-  const taskId = req.params.id;
-  const cleanerId = req.userId;
-  
-  try {
-    const taskCheck = await pool.query(
-      'SELECT status, "cleanerId" FROM "CleaningTask" WHERE id = $1',
-      [taskId]
-    );
-    
-    if (taskCheck.rows.length === 0) {
-      return res.status(404).json({ error: 'Taak niet gevonden' });
-    }
-    
-    if (taskCheck.rows[0].cleanerId !== cleanerId) {
-      return res.status(403).json({ error: 'Deze taak is niet aan jou toegewezen' });
-    }
-    
-    const firstReserve = await pool.query(
-      'SELECT id, "cleanerId" FROM "CleaningReserve" WHERE "taskId" = $1 AND status = $2 ORDER BY position ASC LIMIT 1',
-      [taskId, 'PENDING']
-    );
-    
-    if (firstReserve.rows.length > 0) {
-      await pool.query(
-        'UPDATE "CleaningTask" SET "cleanerId" = $1, status = $2 WHERE id = $3',
-        [firstReserve.rows[0].cleanerId, 'ASSIGNED', taskId]
-      );
-      
-      await pool.query('DELETE FROM "CleaningReserve" WHERE id = $1', [firstReserve.rows[0].id]);
-      
-      await pool.query(
-        'UPDATE "CleaningReserve" SET position = position - 1 WHERE "taskId" = $1 AND position > 1',
-        [taskId]
-      );
-    } else {
-      await pool.query(
-        'UPDATE "CleaningTask" SET "cleanerId" = NULL, status = $1 WHERE id = $2',
-        ['OPEN', taskId]
-      );
-    }
-    
-    res.json({ success: true, message: 'Je hebt je afgemeld voor deze taak' });
-  } catch (error) {
-    console.error('Fout bij afmelden taak:', error);
-    res.status(500).json({ error: 'Kon niet afmelden' });
-  }
-});
-
-app.get('/api/my-tasks', verifyToken, checkActiveUser, async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT ct.*, 
-             p.name as property_name, 
-             p.address,
-             (SELECT COUNT(*) FROM "CleaningReserve" cr WHERE cr."taskId" = ct.id) as reserve_count
-      FROM "CleaningTask" ct
-      LEFT JOIN "Property" p ON ct."propertyId" = p.id
-      WHERE ct."cleanerId" = $1
-      ORDER BY ct."scheduledAt" ASC
-    `, [req.userId]);
-    
-    res.json(result.rows);
-  } catch (error) {
-    console.error('Fout bij ophalen eigen taken:', error);
-    res.status(500).json({ error: 'Kon taken niet ophalen' });
-  }
-});
-
-app.get('/api/my-reserves', verifyToken, checkActiveUser, async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT cr.*, 
-             ct.id as task_id,
-             ct."scheduledAt",
-             ct."cleaningEnd",
-             ct.duration,
-             ct.status as task_status,
-             p.name as property_name,
-             p.address,
-             u.name as cleaner_name
-      FROM "CleaningReserve" cr
-      JOIN "CleaningTask" ct ON cr."taskId" = ct.id
-      LEFT JOIN "Property" p ON ct."propertyId" = p.id
-      LEFT JOIN "User" u ON ct."cleanerId" = u.id
-      WHERE cr."cleanerId" = $1
-      ORDER BY ct."scheduledAt" ASC
-    `, [req.userId]);
-    
-    res.json(result.rows);
-  } catch (error) {
-    console.error('Fout bij ophalen reserves:', error);
-    res.status(500).json({ error: 'Kon reserves niet ophalen' });
-  }
-});
-
-app.delete('/api/my-reserves/:id', verifyToken, checkActiveUser, async (req, res) => {
-  const reserveId = req.params.id;
-  
-  try {
-    const reserveCheck = await pool.query(
-      'SELECT id FROM "CleaningReserve" WHERE id = $1 AND "cleanerId" = $2',
-      [reserveId, req.userId]
-    );
-    
-    if (reserveCheck.rows.length === 0) {
-      return res.status(403).json({ error: 'Geen toegang tot deze reserve' });
-    }
-    
-    await pool.query('DELETE FROM "CleaningReserve" WHERE id = $1', [reserveId]);
-    
-    res.json({ success: true, message: 'Reserve geannuleerd' });
-  } catch (error) {
-    console.error('Fout bij annuleren reserve:', error);
-    res.status(500).json({ error: 'Kon reserve niet annuleren' });
-  }
-});
-
-app.put('/api/cleaner/personal-code', verifyToken, checkActiveUser, async (req, res) => {
-  const { personalCode } = req.body;
-  const userId = req.userId;
-  
-  if (req.userRole !== 'SCHOONMAKER') {
-    return res.status(403).json({ error: 'Alleen schoonmakers kunnen hun code wijzigen' });
-  }
-  
-  if (!personalCode || personalCode.length !== 6 || !/^\d{6}$/.test(personalCode)) {
-    return res.status(400).json({ error: 'Code moet exact 6 cijfers zijn' });
-  }
-  
-  try {
     await pool.query(
-      'UPDATE "User" SET "personalCode" = $1 WHERE id = $2',
-      [personalCode, userId]
+      `INSERT INTO "CleaningScheduleHistory" (id, "cleaningScheduleId", action, "changedBy", "oldValue", "newValue", "createdAt")
+       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, NOW())`,
+      [result.rows[0].id, 'CREATED', req.userId, null, JSON.stringify(result.rows[0])]
     );
+    
+    broadcastUpdate('CLEANING_SCHEDULE_CREATED', result.rows[0]);
+    
+    res.json({ success: true, schedule: result.rows[0] });
+  } catch (error) {
+    console.error('Fout bij toevoegen schoonmaak planning:', error);
+    res.status(500).json({ error: 'Planning kon niet worden toegevoegd' });
+  }
+});
+
+// Schoonmaak planning bijwerken
+app.put('/api/cleaning-schedules/:id', verifyToken, checkActiveUser, checkOwnerOrAdmin, async (req, res) => {
+  const scheduleId = req.params.id;
+  const { title, description, startDate, endDate, cleanerId, status } = req.body;
+  
+  try {
+    const existingSchedule = await pool.query(
+      `SELECT cs.*, p."ownerId" 
+       FROM "CleaningSchedule" cs
+       JOIN "Property" p ON cs."propertyId" = p.id
+       WHERE cs.id = $1`,
+      [scheduleId]
+    );
+    
+    if (existingSchedule.rows.length === 0) {
+      return res.status(404).json({ error: 'Planning niet gevonden' });
+    }
+    
+    if (req.userRole === 'VERHUURDER' && existingSchedule.rows[0].ownerId !== req.userId) {
+      return res.status(403).json({ error: 'Geen toegang tot deze planning' });
+    }
+    
+    const updates = [];
+    const values = [];
+    let paramIndex = 1;
+    const oldValues = existingSchedule.rows[0];
+    const newValues = { ...oldValues };
+    
+    if (title !== undefined) {
+      updates.push(`title = $${paramIndex++}`);
+      values.push(title);
+      newValues.title = title;
+    }
+    if (description !== undefined) {
+      updates.push(`description = $${paramIndex++}`);
+      values.push(description);
+      newValues.description = description;
+    }
+    if (startDate !== undefined) {
+      updates.push(`"startDate" = $${paramIndex++}`);
+      const startDateTime = new Date(startDate);
+      values.push(startDateTime);
+      newValues.startDate = startDateTime;
+    }
+    if (endDate !== undefined) {
+      updates.push(`"endDate" = $${paramIndex++}`);
+      const endDateTime = new Date(endDate);
+      values.push(endDateTime);
+      newValues.endDate = endDateTime;
+    }
+    if (cleanerId !== undefined) {
+      updates.push(`"cleanerId" = $${paramIndex++}`);
+      values.push(cleanerId || null);
+      newValues.cleanerId = cleanerId;
+    }
+    if (status !== undefined) {
+      updates.push(`status = $${paramIndex++}`);
+      values.push(status);
+      newValues.status = status;
+    }
+    
+    updates.push(`"updatedAt" = NOW()`);
+    values.push(scheduleId);
     
     const result = await pool.query(
-      'SELECT id, email, name, role, "isActive", "personalCode" FROM "User" WHERE id = $1',
-      [userId]
+      `UPDATE "CleaningSchedule" SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+      values
     );
     
-    res.json({ success: true, user: result.rows[0] });
+    await pool.query(
+      `INSERT INTO "CleaningScheduleHistory" (id, "cleaningScheduleId", action, "changedBy", "oldValue", "newValue", "createdAt")
+       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, NOW())`,
+      [scheduleId, 'UPDATED', req.userId, JSON.stringify(oldValues), JSON.stringify(newValues)]
+    );
+    
+    broadcastUpdate('CLEANING_SCHEDULE_UPDATED', result.rows[0]);
+    
+    res.json({ success: true, schedule: result.rows[0] });
   } catch (error) {
-    console.error('Fout bij updaten personal code:', error);
-    res.status(500).json({ error: 'Code kon niet worden bijgewerkt' });
+    console.error('Fout bij updaten planning:', error);
+    res.status(500).json({ error: 'Planning kon niet worden bijgewerkt' });
+  }
+});
+
+// Schoonmaak planning verwijderen
+app.delete('/api/cleaning-schedules/:id', verifyToken, checkActiveUser, checkOwnerOrAdmin, async (req, res) => {
+  const scheduleId = req.params.id;
+  
+  try {
+    const scheduleCheck = await pool.query(
+      `SELECT cs.*, p."ownerId" 
+       FROM "CleaningSchedule" cs
+       JOIN "Property" p ON cs."propertyId" = p.id
+       WHERE cs.id = $1`,
+      [scheduleId]
+    );
+    
+    if (scheduleCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Planning niet gevonden' });
+    }
+    
+    if (req.userRole === 'VERHUURDER' && scheduleCheck.rows[0].ownerId !== req.userId) {
+      return res.status(403).json({ error: 'Geen toegang tot deze planning' });
+    }
+    
+    await pool.query('DELETE FROM "CleaningScheduleHistory" WHERE "cleaningScheduleId" = $1', [scheduleId]);
+    await pool.query('DELETE FROM "CleaningSchedule" WHERE id = $1', [scheduleId]);
+    
+    broadcastUpdate('CLEANING_SCHEDULE_DELETED', { id: scheduleId });
+    
+    res.json({ success: true, message: 'Planning verwijderd' });
+  } catch (error) {
+    console.error('Fout bij verwijderen planning:', error);
+    res.status(500).json({ error: 'Planning kon niet worden verwijderd' });
+  }
+});
+
+// Schoonmaak planning toewijzen aan schoonmaker
+app.post('/api/cleaning-schedules/:id/assign', verifyToken, checkActiveUser, checkOwnerOrAdmin, async (req, res) => {
+  const scheduleId = req.params.id;
+  const { cleanerId } = req.body;
+  
+  if (!cleanerId) {
+    return res.status(400).json({ error: 'Schoonmaker is verplicht' });
+  }
+  
+  try {
+    const cleanerCheck = await pool.query(
+      'SELECT id, name, email FROM "User" WHERE id = $1 AND role = $2 AND "isActive" = true',
+      [cleanerId, 'SCHOONMAKER']
+    );
+    
+    if (cleanerCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Schoonmaker niet gevonden' });
+    }
+    
+    const result = await pool.query(
+      `UPDATE "CleaningSchedule" 
+       SET "cleanerId" = $1, status = $2, "updatedAt" = NOW()
+       WHERE id = $3
+       RETURNING *`,
+      [cleanerId, 'ASSIGNED', scheduleId]
+    );
+    
+    broadcastUpdate('CLEANING_SCHEDULE_ASSIGNED', result.rows[0]);
+    
+    res.json({ success: true, schedule: result.rows[0], cleaner: cleanerCheck.rows[0] });
+  } catch (error) {
+    console.error('Fout bij toewijzen:', error);
+    res.status(500).json({ error: 'Kon niet toewijzen' });
+  }
+});
+
+// Schoonmaak planning status updaten (voor schoonmakers)
+app.put('/api/cleaning-schedules/:id/status', verifyToken, checkActiveUser, async (req, res) => {
+  const scheduleId = req.params.id;
+  const { status } = req.body;
+  
+  if (!status) {
+    return res.status(400).json({ error: 'Status is verplicht' });
+  }
+  
+  try {
+    const scheduleCheck = await pool.query(
+      'SELECT * FROM "CleaningSchedule" WHERE id = $1',
+      [scheduleId]
+    );
+    
+    if (scheduleCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Planning niet gevonden' });
+    }
+    
+    // Schoonmaker kan alleen zijn eigen taken updaten
+    if (req.userRole === 'SCHOONMAKER' && scheduleCheck.rows[0].cleanerId !== req.userId) {
+      return res.status(403).json({ error: 'Je bent niet toegewezen aan deze taak' });
+    }
+    
+    const oldValues = scheduleCheck.rows[0];
+    const newValues = { ...oldValues, status };
+    
+    const result = await pool.query(
+      `UPDATE "CleaningSchedule" 
+       SET status = $1, "updatedAt" = NOW()
+       WHERE id = $2
+       RETURNING *`,
+      [status, scheduleId]
+    );
+    
+    await pool.query(
+      `INSERT INTO "CleaningScheduleHistory" (id, "cleaningScheduleId", action, "changedBy", "oldValue", "newValue", "createdAt")
+       VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, NOW())`,
+      [scheduleId, 'STATUS_UPDATED', req.userId, JSON.stringify(oldValues), JSON.stringify(newValues)]
+    );
+    
+    broadcastUpdate('CLEANING_SCHEDULE_STATUS_UPDATED', result.rows[0]);
+    
+    res.json({ success: true, schedule: result.rows[0] });
+  } catch (error) {
+    console.error('Fout bij updaten status:', error);
+    res.status(500).json({ error: 'Status kon niet worden bijgewerkt' });
   }
 });
 
 // ============ KALENDER INTEGRATIE ============
 
-const generateCleaningTasksForProperty = async (propertyId) => {
+const syncCalendarEvents = async (propertyId, platform, icalUrl) => {
+  // Als de URL leeg is of null, verwijder alle boekingen van dit platform
+  if (!icalUrl || icalUrl.trim() === '') {
+    const deleteResult = await pool.query(
+      'DELETE FROM "CalendarEvent" WHERE "propertyId" = $1 AND platform = $2 RETURNING id',
+      [propertyId, platform]
+    );
+    if (deleteResult.rowCount > 0) {
+      console.log(`🗑️ ${deleteResult.rowCount} ${platform} boekingen verwijderd voor property ${propertyId} (geen URL)`);
+    }
+    return { success: true, deletedCount: deleteResult.rowCount };
+  }
+  
   try {
-    const property = await pool.query(
-      'SELECT "cleaningDuration", "daysBetween" FROM "Property" WHERE id = $1',
-      [propertyId]
-    );
+    console.log(`🌐 Fetching iCal from ${icalUrl}`);
+    const response = await fetch(icalUrl);
+    const icalData = await response.text();
+    const events = ical.parseICS(icalData);
     
-    const cleaningDuration = property.rows[0]?.cleaningDuration || 90;
-    const daysBetween = property.rows[0]?.daysBetween || 1;
+    let newCount = 0;
+    let updatedCount = 0;
+    let cleaningCount = 0;
     
-    const bookings = await pool.query(
-      `SELECT ce.* FROM "CalendarEvent" ce 
-       WHERE ce."propertyId" = $1 
-       AND ce.status = 'ACTIVE' 
-       AND ce."checkOut" >= CURRENT_DATE
-       ORDER BY ce."checkIn" ASC`,
-      [propertyId]
-    );
+    // Hardcoded waarden voor automatische schoonmaak
+    const CLEANING_DELAY_HOURS = 1;
+    const CLEANING_DURATION_HOURS = 5;
     
-    if (bookings.rows.length === 0) return;
+    // Verzamel alle externe IDs uit de iCal
+    const externalIdsFromICal = [];
     
-    await pool.query(
-      'DELETE FROM "CleaningTask" WHERE "propertyId" = $1 AND "scheduledAt" >= CURRENT_DATE',
-      [propertyId]
-    );
-    
-    for (let i = 0; i < bookings.rows.length; i++) {
-      const booking = bookings.rows[i];
-      const checkOut = new Date(booking.checkOut);
+    for (const eventId in events) {
+      const event = events[eventId];
+      if (event.type !== 'VEVENT') continue;
       
-      const cleaningStart = new Date(checkOut);
-      cleaningStart.setHours(12, 0, 0, 0);
+      const externalId = event.uid || eventId;
+      externalIdsFromICal.push(externalId);
       
-      const cleaningEnd = new Date(cleaningStart);
-      cleaningEnd.setDate(cleaningEnd.getDate() + daysBetween);
-      cleaningEnd.setHours(12, 0, 0, 0);
+      const checkIn = new Date(event.start);
+      const checkOut = new Date(event.end);
+      const guestName = event.summary || 'Gast';
+      let guestEmail = null;
       
-      await pool.query(
-        `INSERT INTO "CleaningTask" (id, "propertyId", "scheduledAt", "cleaningEnd", duration, status, "createdAt")
-         VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, NOW())`,
-        [propertyId, cleaningStart, cleaningEnd, cleaningDuration, 'OPEN']
+      if (event.description) {
+        const emailMatch = event.description.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+        if (emailMatch) {
+          guestEmail = emailMatch[0];
+        }
+      }
+      
+      const existing = await pool.query(
+        `SELECT id FROM "CalendarEvent" 
+         WHERE "externalId" = $1 AND platform = $2 AND "propertyId" = $3`,
+        [externalId, platform, propertyId]
       );
       
-      console.log(`Schoonmaak taak: ${cleaningStart} tot ${cleaningEnd} (${daysBetween} dagen)`);
+      if (existing.rows.length === 0) {
+        // Nieuwe boeking toevoegen
+        const result = await pool.query(
+          `INSERT INTO "CalendarEvent" (id, "externalId", "propertyId", platform, "guestName", "guestEmail", "checkIn", "checkOut", status, "createdAt", "updatedAt")
+           VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+           RETURNING id`,
+          [externalId, propertyId, platform, guestName, guestEmail, checkIn, checkOut, 'ACTIVE']
+        );
+        newCount++;
+        console.log(`✅ Nieuwe ${platform} boeking: ${guestName} - check-out: ${checkOut.toLocaleString()}`);
+        
+        // Genereer automatische schoonmaak voor deze boeking
+        await generateAutoCleaning(propertyId, checkOut, CLEANING_DELAY_HOURS, CLEANING_DURATION_HOURS);
+        cleaningCount++;
+        
+      } else {
+        // Bestaande boeking updaten
+        await pool.query(
+          `UPDATE "CalendarEvent" 
+           SET "guestName" = $1, "guestEmail" = $2, "checkIn" = $3, "checkOut" = $4, "updatedAt" = NOW()
+           WHERE "externalId" = $5 AND platform = $6 AND "propertyId" = $7`,
+          [guestName, guestEmail, checkIn, checkOut, externalId, platform, propertyId]
+        );
+        updatedCount++;
+        console.log(`🔄 Geüpdatete ${platform} boeking: ${guestName}`);
+      }
     }
     
-    console.log(`${bookings.rows.length} schoonmaak taken gegenereerd voor property ${propertyId}`);
+    // Verwijder boekingen die niet meer in de iCal voorkomen
+    if (externalIdsFromICal.length > 0) {
+      const deleteResult = await pool.query(
+        `DELETE FROM "CalendarEvent" 
+         WHERE "propertyId" = $1 
+         AND platform = $2 
+         AND "externalId" != ALL($3::text[])`,
+        [propertyId, platform, externalIdsFromICal]
+      );
+      
+      if (deleteResult.rowCount > 0) {
+        console.log(`🗑️ ${deleteResult.rowCount} ${platform} boekingen verwijderd (niet meer in iCal)`);
+      }
+    } else {
+      // Geen events in iCal, verwijder alle boekingen van dit platform
+      const deleteResult = await pool.query(
+        'DELETE FROM "CalendarEvent" WHERE "propertyId" = $1 AND platform = $2',
+        [propertyId, platform]
+      );
+      if (deleteResult.rowCount > 0) {
+        console.log(`🗑️ ${deleteResult.rowCount} ${platform} boekingen verwijderd (lege iCal)`);
+      }
+    }
+    
+    broadcastUpdate('CALENDAR_SYNC', { propertyId, platform, newCount, updatedCount, cleaningCount });
+    
+    console.log(`📊 Sync voltooid voor ${platform}: ${newCount} nieuw, ${updatedCount} geüpdatet, ${cleaningCount} schoonmaak gegenereerd`);
+    return { success: true, newCount, updatedCount, cleaningCount };
   } catch (error) {
-    console.error('Fout bij genereren schoonmaak taken:', error);
+    console.error(`❌ Fout bij synchronisatie van ${platform}:`, error);
+    return { success: false, error: error.message };
   }
 };
 
+const generateAutoCleaning = async (propertyId, checkOutDate, delayHours, cleaningHours) => {
+  try {
+    // Controleer of checkOutDate geldig is
+    if (!checkOutDate || isNaN(new Date(checkOutDate).getTime())) {
+      console.error('❌ Ongeldige check-out datum');
+      return null;
+    }
+    
+    const startDate = new Date(checkOutDate);
+    startDate.setHours(startDate.getHours() + delayHours);
+    
+    const endDate = new Date(startDate);
+    endDate.setHours(endDate.getHours() + cleaningHours);
+    
+    console.log(`🔍 Controleren of schoonmaak bestaat voor periode: ${startDate.toLocaleString()} - ${endDate.toLocaleString()}`);
+    
+    // Check of er al een schoonmaak is voor deze periode
+    const existingCleaning = await pool.query(
+      `SELECT id FROM "CleaningSchedule" 
+       WHERE "propertyId" = $1 
+       AND "startDate" <= $2 AND "endDate" >= $3`,
+      [propertyId, endDate, startDate]
+    );
+    
+    if (existingCleaning.rows.length === 0) {
+      const dateStr = startDate.toLocaleDateString('nl-NL');
+      const title = `Schoonmaak - ${dateStr}`;
+      
+      const result = await pool.query(
+        `INSERT INTO "CleaningSchedule" 
+         (id, "propertyId", title, description, "startDate", "endDate", "createdBy", status, "createdAt", "updatedAt")
+         VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+         RETURNING *`,
+        [propertyId, title, `Automatisch gegenereerd (${cleaningHours} uur na check-out)`, startDate, endDate, 'system', 'PENDING']
+      );
+      
+      console.log(`🧹 Automatische schoonmaak gegenereerd: ${startDate.toLocaleString()} - ${endDate.toLocaleString()}`);
+      broadcastUpdate('CLEANING_SCHEDULE_CREATED', result.rows[0]);
+      return result.rows[0];
+    } else {
+      console.log(`⚠️ Schoonmaak bestaat al voor deze periode, niet gedupliceerd`);
+      return null;
+    }
+  } catch (error) {
+    console.error('❌ Fout bij genereren schoonmaak:', error);
+    return null;
+  }
+};
+
+const syncAllProperties = async () => {
+  try {
+    console.log(`[${new Date().toLocaleTimeString()}] Geplande synchronisatie gestart...`);
+    
+    const properties = await pool.query(
+      'SELECT id, "airbnbIcalUrl", "bookingIcalUrl" FROM "Property"'
+    );
+    
+    for (const property of properties.rows) {
+      // Alleen synchroniseren als de URL bestaat en niet leeg is
+      if (property.airbnbIcalUrl && property.airbnbIcalUrl.trim() !== '') {
+        await syncCalendarEvents(property.id, 'AIRBNB', property.airbnbIcalUrl);
+      } else {
+        // Als er geen URL is, verwijder alle boekingen van dat platform
+        await pool.query(
+          'DELETE FROM "CalendarEvent" WHERE "propertyId" = $1 AND platform = $2',
+          [property.id, 'AIRBNB']
+        );
+        console.log(`🗑️ Geen Airbnb URL, alle Airbnb boekingen verwijderd voor property ${property.id}`);
+      }
+      
+      if (property.bookingIcalUrl && property.bookingIcalUrl.trim() !== '') {
+        await syncCalendarEvents(property.id, 'BOOKING', property.bookingIcalUrl);
+      } else {
+        // Als er geen URL is, verwijder alle boekingen van dat platform
+        await pool.query(
+          'DELETE FROM "CalendarEvent" WHERE "propertyId" = $1 AND platform = $2',
+          [property.id, 'BOOKING']
+        );
+        console.log(`🗑️ Geen Booking.com URL, alle Booking.com boekingen verwijderd voor property ${property.id}`);
+      }
+    }
+    
+    console.log(`[${new Date().toLocaleTimeString()}] Synchronisatie voltooid`);
+  } catch (error) {
+    console.error('Fout bij geplande synchronisatie:', error);
+  }
+};
+
+// Kalender endpoint die zowel boekingen als schoonmaak planningen teruggeeft
+app.get('/api/calendar/:propertyId', verifyToken, checkActiveUser, async (req, res) => {
+  const { propertyId } = req.params;
+  const { start, end } = req.query;
+  
+  try {
+    // Haal boekingen op
+    let bookingQuery = `
+      SELECT ce.*, 'booking' as type
+      FROM "CalendarEvent" ce
+      WHERE ce."propertyId" = $1 AND ce.status = 'ACTIVE'
+    `;
+    const params = [propertyId];
+    
+    if (start) {
+      bookingQuery += ` AND ce."checkOut" >= $${params.length + 1}`;
+      params.push(start);
+    }
+    if (end) {
+      bookingQuery += ` AND ce."checkIn" <= $${params.length + 1}`;
+      params.push(end);
+    }
+    
+    const bookings = await pool.query(bookingQuery, params);
+    
+    // Haal schoonmaak planningen op (alleen als tabel bestaat)
+    let cleaningSchedules = { rows: [] };
+    try {
+      let cleaningQuery = `
+        SELECT cs.*, 'cleaning' as type,
+               u.name as cleaner_name,
+               creator.name as created_by_name
+        FROM "CleaningSchedule" cs
+        LEFT JOIN "User" u ON cs."cleanerId" = u.id
+        LEFT JOIN "User" creator ON cs."createdBy" = creator.id
+        WHERE cs."propertyId" = $1
+      `;
+      
+      const cleaningParams = [propertyId];
+      let cleaningParamIndex = 2;
+      
+      if (start) {
+        cleaningQuery += ` AND cs."endDate" >= $${cleaningParamIndex++}`;
+        cleaningParams.push(start);
+      }
+      if (end) {
+        cleaningQuery += ` AND cs."startDate" <= $${cleaningParamIndex++}`;
+        cleaningParams.push(end);
+      }
+      
+      cleaningSchedules = await pool.query(cleaningQuery, cleaningParams);
+    } catch (err) {
+      // Tabel bestaat nog niet, negeer
+      console.log('CleaningSchedule tabel bestaat nog niet, alleen boekingen tonen');
+    }
+    
+    // Combineer resultaten
+    const combined = [...bookings.rows, ...cleaningSchedules.rows];
+    
+    res.json(combined);
+  } catch (error) {
+    console.error('Fout bij ophalen kalender:', error);
+    res.status(500).json({ error: 'Kon kalender niet ophalen' });
+  }
+});
+
+// ============ WEBSOCKET ============
 const WebSocket = require('ws');
 const wss = new WebSocket.Server({ port: 3002 });
 
@@ -1081,130 +1426,12 @@ const broadcastUpdate = (type, data) => {
   });
 };
 
-const syncCalendarEvents = async (propertyId, platform, icalUrl) => {
-  if (!icalUrl) return { success: false, error: 'Geen iCal URL' };
-  
-  try {
-    console.log(`Fetching iCal from ${icalUrl}`);
-    const response = await fetch(icalUrl);
-    const icalData = await response.text();
-    const events = ical.parseICS(icalData);
-    
-    let newCount = 0;
-    let updatedCount = 0;
-    
-    for (const eventId in events) {
-      const event = events[eventId];
-      if (event.type !== 'VEVENT') continue;
-      
-      const externalId = event.uid || eventId;
-      const checkIn = new Date(event.start);
-      const checkOut = new Date(event.end);
-      const guestName = event.summary || 'Gast';
-      let guestEmail = null;
-      
-      if (event.description) {
-        const emailMatch = event.description.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
-        if (emailMatch) {
-          guestEmail = emailMatch[0];
-        }
-      }
-      
-      const existing = await pool.query(
-        'SELECT id FROM "CalendarEvent" WHERE "externalId" = $1 AND platform = $2',
-        [externalId, platform]
-      );
-      
-      if (existing.rows.length === 0) {
-        await pool.query(
-          `INSERT INTO "CalendarEvent" (id, "externalId", "propertyId", platform, "guestName", "guestEmail", "checkIn", "checkOut", status, "createdAt", "updatedAt")
-           VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())`,
-          [externalId, propertyId, platform, guestName, guestEmail, checkIn, checkOut, 'ACTIVE']
-        );
-        newCount++;
-      } else {
-        await pool.query(
-          `UPDATE "CalendarEvent" SET "guestName" = $1, "guestEmail" = $2, "checkIn" = $3, "checkOut" = $4, "updatedAt" = NOW()
-           WHERE "externalId" = $5 AND platform = $6`,
-          [guestName, guestEmail, checkIn, checkOut, externalId, platform]
-        );
-        updatedCount++;
-      }
-    }
-    
-    await generateCleaningTasksForProperty(propertyId);
-    
-    broadcastUpdate('CALENDAR_SYNC', { propertyId, platform, newCount, updatedCount });
-    
-    console.log(`Sync voltooid voor ${platform}: ${newCount} nieuw, ${updatedCount} geüpdatet`);
-    return { success: true, newCount, updatedCount };
-  } catch (error) {
-    console.error(`Fout bij synchronisatie van ${platform}:`, error);
-    return { success: false, error: error.message };
-  }
-};
-
-const syncAllProperties = async () => {
-  try {
-    console.log(`[${new Date().toLocaleTimeString()}] Geplande synchronisatie gestart...`);
-    
-    const properties = await pool.query(
-      'SELECT id, "airbnbIcalUrl", "bookingIcalUrl" FROM "Property"'
-    );
-    
-    for (const property of properties.rows) {
-      if (property.airbnbIcalUrl) {
-        await syncCalendarEvents(property.id, 'AIRBNB', property.airbnbIcalUrl);
-      }
-      if (property.bookingIcalUrl) {
-        await syncCalendarEvents(property.id, 'BOOKING', property.bookingIcalUrl);
-      }
-    }
-    
-    console.log(`[${new Date().toLocaleTimeString()}] Synchronisatie voltooid`);
-  } catch (error) {
-    console.error('Fout bij geplande synchronisatie:', error);
-  }
-};
-
+// ============ START SERVER ============
 setTimeout(() => {
   syncAllProperties();
   setInterval(syncAllProperties, 60 * 1000);
 }, 5000);
 
-app.get('/api/calendar/:propertyId', verifyToken, checkActiveUser, async (req, res) => {
-  const { propertyId } = req.params;
-  const { start, end } = req.query;
-  
-  try {
-    let query = `
-      SELECT ce.*, p.name as property_name
-      FROM "CalendarEvent" ce
-      JOIN "Property" p ON ce."propertyId" = p.id
-      WHERE ce."propertyId" = $1 AND ce.status = 'ACTIVE'
-    `;
-    const params = [propertyId];
-    
-    if (start) {
-      query += ` AND ce."checkOut" >= $${params.length + 1}`;
-      params.push(start);
-    }
-    if (end) {
-      query += ` AND ce."checkIn" <= $${params.length + 1}`;
-      params.push(end);
-    }
-    
-    query += ` ORDER BY ce."checkIn" ASC`;
-    
-    const result = await pool.query(query, params);
-    res.json(result.rows);
-  } catch (error) {
-    console.error('Fout bij ophalen kalender:', error);
-    res.status(500).json({ error: 'Kon kalender niet ophalen' });
-  }
-});
-
-// Tijdelijke force sync endpoint
 app.post('/api/force-sync', async (req, res) => {
   try {
     await syncAllProperties();

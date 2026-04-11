@@ -25,6 +25,7 @@ function Dashboard() {
   const [codeError, setCodeError] = useState('');
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: '' });
+  
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -59,10 +60,12 @@ function Dashboard() {
 
   const fetchProperties = async () => {
     try {
+      setLoading(true);
       const token = localStorage.getItem('token');
       const response = await axios.get(`${API_URL}/api/properties`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      console.log('Properties geladen:', response.data);
       setProperties(response.data);
       if (response.data.length > 0) {
         setSelectedProperty(response.data[0]);
@@ -74,12 +77,14 @@ function Dashboard() {
         localStorage.removeItem('user');
         navigate('/login');
       }
+      showToast('Kon properties niet laden', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
   const fetchPersonalCodes = async () => {
     try {
-      setLoading(true);
       const token = localStorage.getItem('token');
       const response = await axios.get(`${API_URL}/api/personal-codes`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -87,13 +92,18 @@ function Dashboard() {
       setPersonalCodes(response.data);
     } catch (error) {
       console.error('Fout bij ophalen personal codes:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
   const openEditPropertyModal = (property) => {
-    setEditingProperty({ ...property });
+    console.log('Bewerk property:', property);
+    setEditingProperty({ 
+      id: property.id,
+      name: property.name || '',
+      address: property.address || '',
+      airbnbIcalUrl: property.airbnbIcalUrl || '',
+      bookingIcalUrl: property.bookingIcalUrl || ''
+    });
     setShowEditPropertyModal(true);
   };
 
@@ -103,21 +113,23 @@ function Dashboard() {
     
     try {
       const token = localStorage.getItem('token');
+      
       await axios.put(`${API_URL}/api/properties/${editingProperty.id}`, {
         name: editingProperty.name,
         address: editingProperty.address,
-        daysBetween: editingProperty.daysBetween,
-        airbnbIcalUrl: editingProperty.airbnbIcalUrl,
-        bookingIcalUrl: editingProperty.bookingIcalUrl
+        airbnbIcalUrl: editingProperty.airbnbIcalUrl || null,
+        bookingIcalUrl: editingProperty.bookingIcalUrl || null
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      
       setShowEditPropertyModal(false);
       setEditingProperty(null);
-      fetchProperties();
+      await fetchProperties();
       showToast('Woning bijgewerkt!', 'success');
     } catch (error) {
-      showToast('Fout bij bijwerken', 'error');
+      console.error('Fout bij updaten:', error);
+      showToast(error.response?.data?.error || 'Fout bij bijwerken', 'error');
     }
   };
 
@@ -317,7 +329,8 @@ function Dashboard() {
             <>
               <PropertyCalendar 
                 propertyId={selectedProperty.id} 
-                propertyName={selectedProperty.name} 
+                propertyName={selectedProperty.name}
+                userRole={user.role}
               />
               
               <div className="codes-section">
@@ -421,7 +434,7 @@ function Dashboard() {
                 <label>Naam</label>
                 <input 
                   type="text" 
-                  value={editingProperty.name} 
+                  value={editingProperty.name || ''} 
                   onChange={(e) => setEditingProperty({...editingProperty, name: e.target.value})} 
                   required 
                 />
@@ -433,25 +446,8 @@ function Dashboard() {
                   type="text" 
                   value={editingProperty.address || ''} 
                   onChange={(e) => setEditingProperty({...editingProperty, address: e.target.value})} 
+                  placeholder="Straat, nummer, stad"
                 />
-              </div>
-              
-              <div className="form-group">
-                <label>Schoonmaak interval (dagen tussen boekingen)</label>
-                <select 
-                  value={editingProperty.daysBetween || 1} 
-                  onChange={(e) => setEditingProperty({...editingProperty, daysBetween: parseInt(e.target.value)})}
-                >
-                  <option value="0">0 dagen (zelfde dag)</option>
-                  <option value="1">1 dag</option>
-                  <option value="2">2 dagen</option>
-                  <option value="3">3 dagen</option>
-                  <option value="4">4 dagen</option>
-                  <option value="5">5 dagen</option>
-                  <option value="6">6 dagen</option>
-                  <option value="7">7 dagen</option>
-                </select>
-                <small>De schoonmaker heeft deze tijd om de woning te kuisen.</small>
               </div>
               
               <div className="form-group">
